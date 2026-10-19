@@ -8,7 +8,13 @@ import { ArrowLeft, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { products } from '@/data/products';
 
 const WHATSAPP_NUMBER = '96176552059';
-
+const COLORS = [
+  { name: 'White', hex: '#F8F6F1' },
+  { name: 'Beige', hex: '#D8C1A8' },
+  { name: 'Pink', hex: '#E8B6C3' },
+  { name: 'Sage', hex: '#A9B8A2' },
+  { name: 'Brown', hex: '#94715F' },
+];
 export default function ProductPage({
   params,
 }: {
@@ -20,6 +26,10 @@ export default function ProductPage({
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('Beige');
+  const [customName, setCustomName] = useState('');
+  const [occasion, setOccasion] = useState('Birthday');
+  const [instructions, setInstructions] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem('softglow-lang');
@@ -63,17 +73,43 @@ export default function ProductPage({
     setAdded(true);
   }
 
-  function orderOnWhatsApp() {
-    const message = rtl
-      ? `مرحباً Soft Glow، أود طلب:\n${name}\nرمز المنتج: ${code}\nالكمية: ${quantity}\nالرجاء تأكيد السعر والتوصيل في لبنان.`
-      : `Hello Soft Glow! I would like to order:\n${name}\nProduct code: ${code}\nQuantity: ${quantity}\nPlease confirm the price and delivery in Lebanon.`;
+  
+function orderOnWhatsApp() {
+  const message = rtl
+    ? [
+        'مرحباً Soft Glow، أود طلب منتج مخصص:',
+        '',
+        `المنتج: ${name}`,
+        `رمز المنتج: ${code}`,
+        `الكمية: ${quantity}`,
+        `اللون: ${selectedColor}`,
+        `الاسم المخصص: ${customName.trim() || 'لا يوجد'}`,
+        `المناسبة: ${occasion}`,
+        `ملاحظات: ${instructions.trim() || 'لا يوجد'}`,
+        '',
+        'الرجاء تأكيد السعر النهائي والتوفر ورسوم التوصيل في لبنان.'
+      ].join('\n')
+    : [
+        'Hello Soft Glow! I would like to order a customized product:',
+        '',
+        `Product: ${name}`,
+        `Product code: ${code}`,
+        `Quantity: ${quantity}`,
+        `Color: ${selectedColor}`,
+        `Personalized name: ${customName.trim() || 'None'}`,
+        `Occasion: ${occasion}`,
+        `Special instructions: ${instructions.trim() || 'None'}`,
+        '',
+        'Please confirm the final price, availability, and delivery fees in Lebanon.'
+      ].join('\n');
 
-    window.open(
-      `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-  }
+  window.open(
+    `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,
+    '_blank',
+    'noopener,noreferrer'
+  );
+}
+
 
   return (
     <div
@@ -135,6 +171,118 @@ export default function ProductPage({
                 : 'A thoughtfully handmade Soft Glow creation. Contact us to ask about available colors, personalization, and availability.'}
             </p>
 
+{/* Product Customization */}
+<div className="border-t border-[#e9ded3] pt-7 mb-8">
+  <h2 className="serif text-2xl mb-6">
+    {rtl ? 'خصص طلبك' : 'Personalize Your Order'}
+  </h2>
+
+  {/* Colors */}
+  <div className="mb-6">
+    <p className="font-medium mb-3">
+      {rtl ? 'اختر اللون' : 'Choose a color'}
+    </p>
+
+    <div className="flex flex-wrap gap-3">
+      {COLORS.map((color) => (
+        <button
+          key={color.name}
+          type="button"
+          onClick={() => setSelectedColor(color.name)}
+          aria-label={color.name}
+          aria-pressed={selectedColor === color.name}
+          className={`w-11 h-11 rounded-full border-2 ${
+            selectedColor === color.name
+              ? 'border-[#5d4133] ring-2 ring-[#c5a991]'
+              : 'border-[#ded4c9]'
+          }`}
+          style={{ backgroundColor: color.hex }}
+          title={color.name}
+        />
+      ))}
+    </div>
+
+    <p className="text-sm mt-3 text-[#78675e]">
+      {rtl ? 'اللون المختار:' : 'Selected color:'}{' '}
+      {selectedColor}
+    </p>
+  </div>
+
+  {/* Personalized Name */}
+  <div className="mb-6">
+    <label htmlFor="customName" className="block font-medium mb-2">
+      {rtl ? 'الاسم المخصص (اختياري)' : 'Personalized name (optional)'}
+    </label>
+
+    <input
+      id="customName"
+      type="text"
+      maxLength={60}
+      value={customName}
+      onChange={(e) => setCustomName(e.target.value)}
+      placeholder={rtl ? 'مثال: سارة' : 'Example: Sarah'}
+      className="w-full border border-[#ded4c9] bg-white rounded-xl px-4 py-3"
+    />
+  </div>
+
+  {/* Occasion */}
+  <div className="mb-6">
+    <label htmlFor="occasion" className="block font-medium mb-2">
+      {rtl ? 'المناسبة' : 'Occasion'}
+    </label>
+
+    <select
+      id="occasion"
+      value={occasion}
+      onChange={(e) => setOccasion(e.target.value)}
+      className="w-full border border-[#ded4c9] bg-white rounded-xl px-4 py-3"
+    >
+      <option value="Birthday">
+        {rtl ? 'عيد ميلاد' : 'Birthday'}
+      </option>
+      <option value="Wedding">
+        {rtl ? 'زفاف' : 'Wedding'}
+      </option>
+      <option value="Baby shower">
+        {rtl ? 'استقبال مولود' : 'Baby shower'}
+      </option>
+      <option value="Graduation">
+        {rtl ? 'تخرج' : 'Graduation'}
+      </option>
+      <option value="Other">
+        {rtl ? 'مناسبة أخرى' : 'Other'}
+      </option>
+    </select>
+  </div>
+
+  {/* Special Instructions */}
+  <div className="mb-4">
+    <label htmlFor="instructions" className="block font-medium mb-2">
+      {rtl ? 'ملاحظات خاصة' : 'Special instructions'}
+    </label>
+
+    <textarea
+      id="instructions"
+      rows={3}
+      maxLength={500}
+      value={instructions}
+      onChange={(e) => setInstructions(e.target.value)}
+      placeholder={
+        rtl
+          ? 'مثال: إضافة تفاصيل ذهبية وتغليف هدية'
+          : 'Example: Gold details and gift wrapping'
+      }
+      className="w-full border border-[#ded4c9] bg-white rounded-xl px-4 py-3"
+    />
+  </div>
+
+  <p className="text-xs text-[#78675e]">
+    {rtl
+      ? 'جميع خيارات التخصيص تخضع للتأكيد وقد تؤثر على السعر ومدة التحضير.'
+      : 'Customization options are subject to confirmation and may affect price and preparation time.'}
+  </p>
+</div>
+
             <p className="font-medium mb-3">
               {rtl ? 'الكمية' : 'Quantity'}
             </p>
@@ -159,33 +307,48 @@ export default function ProductPage({
               </button>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={addToCart}
-                className="bg-[#5d4133] text-white rounded-full py-4 flex justify-center items-center gap-3"
-              >
-                <ShoppingBag size={19} />
-                {rtl ? 'أضف إلى السلة' : 'Add to Bag'}
-              </button>
 
-              {added && (
-                <p className="text-center text-sm">
-                  {rtl ? 'تمت الإضافة إلى السلة' : 'Added to your bag'}
-                  {' · '}
-                  <Link href="/#shop" className="underline">
-                    {rtl ? 'العودة إلى المتجر' : 'Return to shop'}
-                  </Link>
-                </p>
-              )}
+<div className="flex flex-col gap-3">
+  {/* Add to Bag Button */}
+  <button
+    type="button"
+    onClick={addToCart}
+    disabled={
+      selectedColor !== 'Beige' ||
+      customName.trim() !== '' ||
+      occasion !== 'Birthday' ||
+      instructions.trim() !== ''
+    }
+    className="bg-[#5d4133] text-white rounded-full py-4 flex justify-center items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+  >
+    <ShoppingBag size={19} />
+    {rtl ? 'أضف إلى السلة' : 'Add to Bag'}
+  </button>
 
-              <button
-                onClick={orderOnWhatsApp}
-                className="border border-[#5d4133] rounded-full py-4"
-              >
-                {rtl ? 'اطلب عبر واتساب' : 'Order on WhatsApp'}
-              </button>
-            </div>
+  {/* Custom Order Information */}
+  <p className="text-xs text-center text-[#78675e]">
+    {rtl
+      ? 'للطلبات المخصصة، يرجى استخدام زر واتساب.'
+      : 'For customized orders, please use the WhatsApp button.'}
+  </p>
 
+{added && (
+  <p className="text-center text-sm">
+    {rtl ? 'تمت الإضافة إلى السلة' : 'Added to your bag'}
+    {' · '}
+    <Link href="/#shop" className="underline">
+      {rtl ? 'العودة إلى المتجر' : 'Return to shop'}
+    </Link>
+  </p>
+)}
+
+<button
+  onClick={orderOnWhatsApp}
+  className="border border-[#5d4133] rounded-full py-4"
+>
+  {rtl ? 'اطلب عبر واتساب' : 'Order on WhatsApp'}
+</button>
+</div>
             <div className="mt-9 border-t pt-6 text-sm text-[#78675e]">
               {rtl
                 ? 'التوصيل متاح إلى جميع أنحاء لبنان. يتم تأكيد الأسعار ورسوم التوصيل قبل إتمام الطلب.'

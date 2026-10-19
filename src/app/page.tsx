@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import {useEffect,useMemo,useState} from 'react';
 import Image from 'next/image';
 import {ShoppingBag,Menu,X,Instagram,Heart,Search,ArrowRight,ArrowLeft,Minus,Plus} from 'lucide-react';
@@ -10,8 +11,34 @@ const WHATSAPP_NUMBER='96176552059';
 function whatsapp(message:string){if(!WHATSAPP_NUMBER){alert('Set WHATSAPP_NUMBER in src/app/page.tsx before enabling WhatsApp orders.');return;}window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,'_blank','noopener,noreferrer')}
 export default function Home(){
  const [lang,setLang]=useState<'en'|'ar'>('en');const [category,setCategory]=useState<Category|'all'>('all');const [query,setQuery]=useState('');const [cart,setCart]=useState<Record<number,number>>({});const [cartOpen,setCartOpen]=useState(false);const [menuOpen,setMenuOpen]=useState(false);
- useEffect(()=>{try{const saved=localStorage.getItem('softglow-cart');if(saved)setCart(JSON.parse(saved))}catch{}},[]);
- useEffect(()=>{localStorage.setItem('softglow-cart',JSON.stringify(cart))},[cart]);
+ const [cartLoaded, setCartLoaded] = useState(false);
+useEffect(() => {
+  const saved = localStorage.getItem('softglow-lang');
+
+  if (saved === 'en' || saved === 'ar') {
+    setLang(saved);
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem('softglow-lang', lang);
+}, [lang]);
+useEffect(() => {
+  try {
+    const saved = localStorage.getItem('softglow-cart');
+    if (saved) setCart(JSON.parse(saved));
+  } catch {
+    // Start with an empty cart if saved data is invalid.
+  }
+
+  setCartLoaded(true);
+}, []);
+
+useEffect(() => {
+  if (cartLoaded) {
+    localStorage.setItem('softglow-cart', JSON.stringify(cart));
+  }
+}, [cart, cartLoaded]);
  const t=copy[lang],rtl=lang==='ar';const filtered=useMemo(()=>products.filter(p=>(category==='all'||p.category===category)&&(`${p.en} ${p.ar}`.toLowerCase().includes(query.toLowerCase()))),[category,query]);
  const count=Object.values(cart).reduce((a,b)=>a+b,0);const add=(id:number)=>setCart(c=>({...c,[id]:(c[id]||0)+1}));const change=(id:number,delta:number)=>setCart(c=>{const n={...c};n[id]=Math.max(0,(n[id]||0)+delta);if(!n[id])delete n[id];return n});
  const orderText = () => [
@@ -45,7 +72,14 @@ export default function Home(){
  <header className="sticky top-0 z-30 bg-[#fbf7f2]/95 backdrop-blur border-b border-[#e9ded3]"><div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between gap-4"><a href="#home" className="serif text-3xl tracking-tight">Soft <span className="italic text-[#a97b61]">Glow</span><span className="block text-[9px] tracking-[.27em] uppercase text-[#927e70] text-center">Handmade with love</span></a><nav className="hidden md:flex items-center gap-7 text-sm"><a href="#home">{t.home}</a><a href="#shop">{t.products}</a><a href="#about">{t.about}</a><a href="#contact">{t.contactNav}</a></nav><div className="flex items-center gap-4"><button aria-label="Switch language" className="text-sm font-semibold" onClick={()=>setLang(l=>l==='en'?'ar':'en')}>{lang==='en'?'العربية':'English'}</button><button aria-label="Open cart" className="relative" onClick={()=>setCartOpen(true)}><ShoppingBag size={22}/>{count>0&&<span className="absolute -top-2 -end-2 bg-[#a97b61] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{count}</span>}</button><button aria-label="Toggle menu" className="md:hidden" onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X/>:<Menu/>}</button></div></div>{menuOpen&&<nav className="md:hidden flex flex-col px-6 pb-4 gap-3 text-sm"><a onClick={()=>setMenuOpen(false)} href="#home">{t.home}</a><a onClick={()=>setMenuOpen(false)} href="#shop">{t.products}</a><a onClick={()=>setMenuOpen(false)} href="#about">{t.about}</a><a onClick={()=>setMenuOpen(false)} href="#contact">{t.contactNav}</a></nav>}</header>
  <main id="home"><section className="bg-[#eee0d1]"><div className="max-w-7xl mx-auto grid md:grid-cols-2 items-center"><div className="p-9 sm:p-14 lg:p-20 order-2 md:order-1"><p className="uppercase tracking-[.25em] text-xs text-[#9c7059] mb-5">SOFT GLOW · LEBANON</p><h1 className="serif text-5xl sm:text-6xl lg:text-7xl leading-[1.08] mb-6">{t.hero}</h1><p className="text-[#78675e] leading-7 max-w-md mb-8">{t.sub}</p><a className="primary inline-flex gap-3 items-center" href="#shop">{t.shop}<Arrow size={17}/></a></div><div className="relative h-[390px] md:h-[590px] order-1 md:order-2"><Image src="/products/02.webp" alt="Soft Glow handmade floral bouquet" fill priority className="object-cover" sizes="(max-width: 768px) 100vw, 50vw"/></div></div></section>
  <section className="max-w-7xl mx-auto px-4 sm:px-8 py-16"><div className="flex justify-between items-end mb-8"><div><p className="uppercase tracking-[.25em] text-xs muted mb-2">SOFT GLOW</p><h2 className="serif text-4xl">{t.cat}</h2></div><a href="#shop" className="text-sm underline underline-offset-4">{t.all}</a></div><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-5">{categories.map(c=><button key={c.id} className="text-center group" onClick={()=>{setCategory(c.id);document.getElementById('shop')?.scrollIntoView({behavior:'smooth'})}}><div className="relative aspect-square rounded-full overflow-hidden mb-3 bg-[#eee0d1]"><Image src={`/products/${String(c.image).padStart(2,'0')}.webp`} alt={lang==='en'?c.en:c.ar} fill sizes="(max-width: 640px) 45vw, 15vw" className="object-cover group-hover:scale-105 transition duration-300"/></div><span className="text-sm">{lang==='en'?c.en:c.ar}</span></button>)}</div></section>
- <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-8 pb-20 scroll-mt-24"><div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-5 mb-7"><div><p className="uppercase tracking-[.25em] text-xs muted mb-2">THE COLLECTION</p><h2 className="serif text-4xl">{t.collection}</h2></div><div className="flex items-center gap-2 bg-white border border-[#e9ded3] rounded-full px-4 py-3"><Search size={17} className="muted"/><input aria-label={t.search} placeholder={t.search} value={query} onChange={e=>setQuery(e.target.value)} className="bg-transparent text-sm w-52"/></div></div><div className="flex gap-2 overflow-x-auto pb-5 mb-4"><button className={`chip ${category==='all'?'active':''}`} onClick={()=>setCategory('all')}>{t.all}</button>{categories.map(c=><button key={c.id} className={`chip ${category===c.id?'active':''}`} onClick={()=>setCategory(c.id)}>{lang==='en'?c.en:c.ar}</button>)}</div><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">{filtered.map(p=><article key={p.id} className="card group"><div className="relative aspect-[4/5] bg-[#eee0d1]"><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover group-hover:scale-[1.03] transition duration-300"/><span className="absolute top-3 start-3 bg-white/90 rounded-full px-2 py-1 text-[10px]">SG-{String(p.id).padStart(3,'0')}</span></div><div className="p-4"><h3 className="text-sm sm:text-base font-medium min-h-11">{lang==='en'?p.en:p.ar}</h3><p className="text-sm muted my-2">{p.price === null
+ <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-8 pb-20 scroll-mt-24"><div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-5 mb-7"><div><p className="uppercase tracking-[.25em] text-xs muted mb-2">THE COLLECTION</p><h2 className="serif text-4xl">{t.collection}</h2></div><div className="flex items-center gap-2 bg-white border border-[#e9ded3] rounded-full px-4 py-3"><Search size={17} className="muted"/><input aria-label={t.search} placeholder={t.search} value={query} onChange={e=>setQuery(e.target.value)} className="bg-transparent text-sm w-52"/></div></div><div className="flex gap-2 overflow-x-auto pb-5 mb-4"><button className={`chip ${category==='all'?'active':''}`} onClick={()=>setCategory('all')}>{t.all}</button>{categories.map(c=><button key={c.id} className={`chip ${category===c.id?'active':''}`} onClick={()=>setCategory(c.id)}>{lang==='en'?c.en:c.ar}</button>)}</div><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">{filtered.map(p=><article key={p.id} className="card group"><Link
+  href={`/products/${p.id}`}
+  className="block relative aspect-[4/5] bg-[#eee0d1]"
+><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover group-hover:scale-[1.03] transition duration-300"/><span className="absolute top-3 start-3 bg-white/90 rounded-full px-2 py-1 text-[10px]">SG-{String(p.id).padStart(3,'0')}</span></Link><div className="p-4"><Link href={`/products/${p.id}`}>
+  <h3 className="text-sm sm:text-base font-medium min-h-11 hover:underline">
+    {lang === 'en' ? p.en : p.ar}
+  </h3>
+</Link><p className="text-sm muted my-2">{p.price === null
   ? (rtl ? 'السعر عند الطلب' : 'Price on request')
   : `${rtl ? 'السعر التقديري' : 'Estimated price'}: $${p.price.toFixed(2)}`}</p><button onClick={()=>add(p.id)} className="w-full bg-[#5d4133] text-white rounded-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2"><Plus size={15}/>{t.added}</button></div></article>)}</div>{filtered.length===0&&<p className="text-center py-16 muted">{t.noResults}</p>}</section>
 <section className="bg-[#f3eae1] py-14 px-6">

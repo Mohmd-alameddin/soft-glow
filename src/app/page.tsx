@@ -136,12 +136,7 @@ useEffect(() => {
   >
     {t.contact}
   </button>
-  <Link
-  href="/checkout"
-  className="block text-center bg-[#5d4133] text-white rounded-full px-6 py-4 hover:opacity-90"
->
-  {rtl ? 'إتمام الطلب' : 'Proceed to Checkout'}
-</Link>
+
 
   {/* Instagram Link */}
   <div className="mt-6">
@@ -157,6 +152,32 @@ useEffect(() => {
 </section>
 </main>
 <footer className="bg-[#5d4133] text-[#f9f0e7] py-10 text-center"><p className="serif text-3xl mb-3">Soft Glow</p><p className="text-sm opacity-80">{t.footer}</p><p className="text-xs opacity-60 mt-5">© {new Date().getFullYear()} Soft Glow</p></footer>
- {cartOpen&&<div className="fixed inset-0 z-50"><button aria-label="Close cart" className="absolute inset-0 bg-black/45 w-full" onClick={()=>setCartOpen(false)}></button><aside className={`absolute top-0 bottom-0 ${rtl?'left-0':'right-0'} bg-[#fbf7f2] w-full max-w-md shadow-2xl p-6 flex flex-col`} dir={rtl?'rtl':'ltr'}><div className="flex justify-between items-center border-b pb-5 mb-6"><h2 className="serif text-3xl">{t.cart} ({count})</h2><button aria-label="Close cart" onClick={()=>setCartOpen(false)}><X/></button></div><div className="flex-1 overflow-y-auto">{count===0?<p className="muted">{t.empty}</p>:Object.entries(cart).map(([id,qty])=>{const p=products.find(p=>p.id===Number(id))!;return <div key={id} className="flex gap-4 mb-5"><div className="relative w-24 h-28 shrink-0 rounded-lg overflow-hidden"><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill className="object-cover" sizes="96px"/></div><div className="flex-1"><p className="text-sm font-medium">{lang==='en'?p.en:p.ar}</p><p className="text-xs muted mt-2">{t.price}</p><div className="flex items-center gap-4 mt-4"><button aria-label="Decrease quantity" onClick={()=>change(p.id,-1)}><Minus size={16}/></button><span>{qty}</span><button aria-label="Increase quantity" onClick={()=>change(p.id,1)}><Plus size={16}/></button><button className="text-xs underline ms-auto" onClick={()=>change(p.id,-qty)}>{t.remove}</button></div></div></div>})}</div><div className="border-t pt-5"><p className="text-xs muted mb-4">{t.note}</p><button disabled={count===0} className="primary w-full" onClick={()=>whatsapp(orderText())}>{t.order}</button></div></aside></div>}
+ {cartOpen&&<div className="fixed inset-0 z-50"><button aria-label="Close cart" className="absolute inset-0 bg-black/45 w-full" onClick={()=>setCartOpen(false)}></button><aside className={`absolute top-0 bottom-0 ${rtl?'left-0':'right-0'} bg-[#fbf7f2] w-full max-w-md shadow-2xl p-6 flex flex-col`} dir={rtl?'rtl':'ltr'}><div className="flex justify-between items-center border-b pb-5 mb-6"><h2 className="serif text-3xl">{t.cart} ({count})</h2><button aria-label="Close cart" onClick={()=>setCartOpen(false)}><X/></button></div><div className="flex-1 overflow-y-auto">{count===0?<p className="muted">{t.empty}</p>:Object.entries(cart).map(([id,qty])=>{const p=products.find(p=>p.id===Number(id))!;return <div key={id} className="flex gap-4 mb-5"><div className="relative w-24 h-28 shrink-0 rounded-lg overflow-hidden"><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill className="object-cover" sizes="96px"/></div><div className="flex-1"><p className="text-sm font-medium">{lang==='en'?p.en:p.ar}</p><p className="text-xs muted mt-2">{t.price}</p><div className="flex items-center gap-4 mt-4"><button aria-label="Decrease quantity" onClick={()=>change(p.id,-1)}><Minus size={16}/></button><span>{qty}</span><button aria-label="Increase quantity" onClick={()=>change(p.id,1)}><Plus size={16}/></button><button className="text-xs underline ms-auto" onClick={()=>change(p.id,-qty)}>{t.remove}</button></div></div></div>})}</div>
+<div className="border-t pt-5">
+  <p className="text-xs muted mb-4">
+    {t.note}
+  </p>
+
+  {/* Proceed to Checkout */}
+  {count > 0 && (
+    <Link
+      href="/checkout"
+      onClick={() => setCartOpen(false)}
+      className="block text-center bg-[#5d4133] text-white rounded-full px-6 py-4 mb-3 hover:opacity-90"
+    >
+      {rtl ? 'إتمام الطلب' : 'Proceed to Checkout'}
+    </Link>
+  )}
+
+  {/* WhatsApp Order */}
+  <button
+    disabled={count === 0}
+    className="primary w-full"
+    onClick={() => whatsapp(orderText())}
+  >
+    {t.order}
+  </button>
+</div>
+</aside></div>}
  </div>;
 }

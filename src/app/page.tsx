@@ -136,6 +136,12 @@ useEffect(() => {
   >
     {t.contact}
   </button>
+  <Link
+  href="/checkout"
+  className="block text-center bg-[#5d4133] text-white rounded-full px-6 py-4 hover:opacity-90"
+>
+  {rtl ? 'إتمام الطلب' : 'Proceed to Checkout'}
+</Link>
 
   {/* Instagram Link */}
   <div className="mt-6">

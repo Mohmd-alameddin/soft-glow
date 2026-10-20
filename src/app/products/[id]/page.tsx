@@ -97,22 +97,33 @@ export default function ProductPage({
   const name = rtl ? product.ar : product.en;
   const code = `SG-${String(product.id).padStart(3, '0')}`;
 
-  function addToCart() {
-    if (!product) return;
+  
+function addToCart() {
+  if (!product) return;
 
-    let cart: Record<number, number> = {};
+  const productId = product.id;
 
-    try {
-      const saved = localStorage.getItem('softglow-cart');
-      if (saved) cart = JSON.parse(saved);
-    } catch {
-      cart = {};
+  let cart: Record<number, number> = {};
+
+  try {
+    const saved = localStorage.getItem('softglow-cart');
+
+    if (saved) {
+      cart = JSON.parse(saved);
     }
-
-    cart[product.id] = (cart[product.id] || 0) + quantity;
-    localStorage.setItem('softglow-cart', JSON.stringify(cart));
-    setAdded(true);
+  } catch {
+    cart = {};
   }
+
+  cart[productId] = (cart[productId] || 0) + quantity;
+
+  localStorage.setItem(
+    'softglow-cart',
+    JSON.stringify(cart)
+  );
+
+  setAdded(true);
+}
 
   
 function orderOnWhatsApp() {

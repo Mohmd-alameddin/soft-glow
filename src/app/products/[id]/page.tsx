@@ -98,6 +98,8 @@ export default function ProductPage({
   const code = `SG-${String(product.id).padStart(3, '0')}`;
 
   function addToCart() {
+    if (!product) return;
+
     let cart: Record<number, number> = {};
 
     try {

@@ -5,7 +5,8 @@ import { use, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Minus, Plus, ShoppingBag } from 'lucide-react';
-import { products } from '@/data/products';
+import type { Product } from '@/data/products';
+import { loadShopProducts } from '@/lib/shop-products';
 
 const WHATSAPP_NUMBER = '96176552059';
 const COLORS = [
@@ -21,7 +22,9 @@ export default function ProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const product = products.find((p) => p.id === Number(id));
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [quantity, setQuantity] = useState(1);
@@ -36,12 +39,48 @@ export default function ProductPage({
     if (saved === 'ar' || saved === 'en') setLang(saved);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError('');
+
+    loadShopProducts()
+      .then((items) => {
+        if (active) setProduct(items.find((item) => item.id === Number(id)) ?? null);
+      })
+      .catch(() => {
+        if (active) setLoadError('Unable to load this product. Please try again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [id]);
+
   const rtl = lang === 'ar';
 
   function changeLanguage() {
     const next = lang === 'en' ? 'ar' : 'en';
     setLang(next);
     localStorage.setItem('softglow-lang', next);
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#fbf7f2] text-[#5d4133]">
+        <p>{rtl ? 'جاري تحميل المنتج...' : 'Loading product...'}</p>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#fbf7f2] text-[#5d4133]">
+        <p role="alert">{rtl ? 'تعذر تحميل المنتج. يرجى المحاولة مرة أخرى.' : loadError}</p>
+        <Link href="/#shop" className="underline">{rtl ? 'العودة إلى المتجر' : 'Return to shop'}</Link>
+      </main>
+    );
   }
 
   if (!product) {
@@ -68,7 +107,7 @@ export default function ProductPage({
       cart = {};
     }
 
-    cart[product!.id] = (cart[product!.id] || 0) + quantity;
+    cart[product.id] = (cart[product.id] || 0) + quantity;
     localStorage.setItem('softglow-cart', JSON.stringify(cart));
     setAdded(true);
   }

@@ -1,183 +1,330 @@
 'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {useEffect,useMemo,useState} from 'react';
 import Image from 'next/image';
-import {ShoppingBag,Menu,X,Instagram,Heart,Search,ArrowRight,ArrowLeft,Minus,Plus} from 'lucide-react';
-import {products,Category} from '@/data/products';
-const categories:{id:Category;en:string;ar:string;image:number}[]=[{id:'florals',en:'Floral Creations',ar:'تنسيقات الزهور',image:2},{id:'candles',en:'Candles',ar:'الشموع',image:26},{id:'decor',en:'Gypsum & Decor',ar:'الجبس والديكور',image:11},{id:'arabic',en:'Arabic Art',ar:'فن الخط العربي',image:9},{id:'personalized',en:'Personalized Gifts',ar:'هدايا مخصصة',image:23},{id:'baby',en:'Baby Gifts',ar:'هدايا المواليد',image:24},{id:'seasonal',en:'Seasonal',ar:'الموسمية',image:30}];
-const copy={en:{tag:'Made by hand, made with love',hero:'Little details. Lasting warmth.',sub:'Discover thoughtful handmade candles, floral keepsakes and beautiful decor, crafted for the moments that matter.',shop:'Explore the collection',cat:'Shop by category',all:'All products',collection:'Our creations',intro:'Every piece has a story',introText:'From meaningful gifts to small details for your home, Soft Glow celebrates the beauty of handmade.',custom:'Looking for something personal?',customText:'We create thoughtful pieces for celebrations, names and special moments. Tell us what you imagine.',contact:'Ask about a custom order',cart:'Your bag',empty:'Your bag is empty',order:'Order on WhatsApp',price:'Price on request',added:'Add to bag',search:'Search creations...',noResults:'No products found',note:'Prices and availability are confirmed when you order.',footer:'Handmade in Lebanon, with love.',home:'Home',products:'Products',about:'Our story',contactNav:'Contact',remove:'Remove',items:'items'},ar:{tag:'صُنع يدويًا بكل حب',hero:'تفاصيل صغيرة. دفء يدوم.',sub:'اكتشفوا الشموع والهدايا والتصاميم اليدوية المصنوعة بعناية لترافق أجمل لحظاتكم.',shop:'تسوقوا المجموعة',cat:'تسوقوا حسب الفئة',all:'كل المنتجات',collection:'إبداعاتنا',intro:'لكل قطعة حكاية',introText:'من الهدايا المميزة إلى تفاصيل المنزل، نحتفي في سوفت غلو بجمال الأعمال اليدوية.',custom:'تبحثون عن هدية خاصة؟',customText:'نصمم قطعًا مخصصة للمناسبات والأسماء واللحظات الجميلة. شاركونا أفكاركم.',contact:'اطلبوا تصميمًا خاصًا',cart:'سلة التسوق',empty:'سلة التسوق فارغة',order:'الطلب عبر واتساب',price:'السعر عند الطلب',added:'أضف إلى السلة',search:'ابحثوا عن منتج...',noResults:'لا توجد منتجات',note:'يتم تأكيد الأسعار والتوفر عند الطلب.',footer:'صنع يدويًا في لبنان، بكل حب.',home:'الرئيسية',products:'المنتجات',about:'قصتنا',contactNav:'تواصلوا معنا',remove:'إزالة',items:'قطع'}};
-// Replace with your Lebanon WhatsApp number including country code, digits only, e.g. 961XXXXXXXX.
-const WHATSAPP_NUMBER='96176552059';
-function whatsapp(message:string){if(!WHATSAPP_NUMBER){alert('Set WHATSAPP_NUMBER in src/app/page.tsx before enabling WhatsApp orders.');return;}window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,'_blank','noopener,noreferrer')}
-export default function Home(){
- const [lang,setLang]=useState<'en'|'ar'>('en');const [category,setCategory]=useState<Category|'all'>('all');const [query,setQuery]=useState('');const [cart,setCart]=useState<Record<number,number>>({});const [cartOpen,setCartOpen]=useState(false);const [menuOpen,setMenuOpen]=useState(false);
- const [cartLoaded, setCartLoaded] = useState(false);
-useEffect(() => {
-  const saved = localStorage.getItem('softglow-lang');
+import {
+  ShoppingBag, Menu, X, Instagram, Heart, Search,
+  ArrowRight, ArrowLeft, Minus, Plus, Trash2,
+} from 'lucide-react';
+import type { Category, Product } from '@/data/products';
+import { loadShopProducts } from '@/lib/shop-products';
 
-  if (saved === 'en' || saved === 'ar') {
-    setLang(saved);
-  }
-}, []);
+const WHATSAPP_NUMBER = '96176552059';
+const categories: { id: Category; en: string; ar: string; image: number }[] = [
+  { id: 'florals', en: 'Floral Creations', ar: 'تنسيقات الزهور', image: 2 },
+  { id: 'candles', en: 'Candles', ar: 'الشموع', image: 26 },
+  { id: 'decor', en: 'Gypsum & Decor', ar: 'الجبس والديكور', image: 11 },
+  { id: 'arabic', en: 'Arabic Art', ar: 'فن الخط العربي', image: 9 },
+  { id: 'personalized', en: 'Personalized Gifts', ar: 'هدايا مخصصة', image: 23 },
+  { id: 'baby', en: 'Baby Gifts', ar: 'هدايا المواليد', image: 24 },
+  { id: 'seasonal', en: 'Seasonal', ar: 'الموسمية', image: 30 },
+];
 
-useEffect(() => {
-  localStorage.setItem('softglow-lang', lang);
-}, [lang]);
-useEffect(() => {
-  try {
-    const saved = localStorage.getItem('softglow-cart');
-    if (saved) setCart(JSON.parse(saved));
-  } catch {
-    // Start with an empty cart if saved data is invalid.
-  }
+const copy = {
+  en: {
+    tag: 'Made by hand, made with love', hero: 'Little details. Lasting warmth.',
+    sub: 'Discover thoughtful handmade candles, floral keepsakes and beautiful decor, crafted for the moments that matter.',
+    shop: 'Explore the collection', cat: 'Shop by category', all: 'All products',
+    collection: 'Our creations', intro: 'Every piece has a story',
+    introText: 'From meaningful gifts to small details for your home, Soft Glow celebrates the beauty of handmade.',
+    custom: 'Looking for something personal?',
+    customText: 'We create thoughtful pieces for celebrations, names and special moments. Tell us what you imagine.',
+    contact: 'Ask about a custom order', cart: 'Your bag', empty: 'Your bag is empty',
+    order: 'Order on WhatsApp', price: 'Price on request', added: 'Add to bag',
+    search: 'Search creations...', noResults: 'No products found',
+    note: 'Prices and availability are confirmed when you order.',
+    footer: 'Handmade in Lebanon, with love.', home: 'Home', products: 'Products',
+    about: 'Our story', contactNav: 'Contact', remove: 'Remove',
+    checkout: 'Proceed to Checkout', loading: 'Loading products...',
+    error: 'Unable to load products. Please refresh the page.',
+    unavailable: 'Some items in your bag are no longer available. Remove them to continue.',
+  },
+  ar: {
+    tag: 'صُنع يدويًا بكل حب', hero: 'تفاصيل صغيرة. دفء يدوم.',
+    sub: 'اكتشفوا الشموع والهدايا والتصاميم اليدوية المصنوعة بعناية لترافق أجمل لحظاتكم.',
+    shop: 'تسوقوا المجموعة', cat: 'تسوقوا حسب الفئة', all: 'كل المنتجات',
+    collection: 'إبداعاتنا', intro: 'لكل قطعة حكاية',
+    introText: 'من الهدايا المميزة إلى تفاصيل المنزل، نحتفي في سوفت غلو بجمال الأعمال اليدوية.',
+    custom: 'تبحثون عن هدية خاصة؟',
+    customText: 'نصمم قطعًا مخصصة للمناسبات والأسماء واللحظات الجميلة. شاركونا أفكاركم.',
+    contact: 'اطلبوا تصميمًا خاصًا', cart: 'سلة التسوق', empty: 'سلة التسوق فارغة',
+    order: 'الطلب عبر واتساب', price: 'السعر عند الطلب', added: 'أضف إلى السلة',
+    search: 'ابحثوا عن منتج...', noResults: 'لا توجد منتجات',
+    note: 'يتم تأكيد الأسعار والتوفر عند الطلب.',
+    footer: 'صنع يدويًا في لبنان، بكل حب.', home: 'الرئيسية', products: 'المنتجات',
+    about: 'قصتنا', contactNav: 'تواصلوا معنا', remove: 'إزالة',
+    checkout: 'إتمام الطلب', loading: 'جاري تحميل المنتجات...',
+    error: 'تعذر تحميل المنتجات. يرجى تحديث الصفحة.',
+    unavailable: 'بعض المنتجات في السلة لم تعد متوفرة. يرجى إزالتها للمتابعة.',
+  },
+};
 
-  setCartLoaded(true);
-}, []);
+type Cart = Record<number, number>;
 
-useEffect(() => {
-  if (cartLoaded) {
-    localStorage.setItem('softglow-cart', JSON.stringify(cart));
-  }
-}, [cart, cartLoaded]);
- const t=copy[lang],rtl=lang==='ar';const filtered=useMemo(()=>products.filter(p=>(category==='all'||p.category===category)&&(`${p.en} ${p.ar}`.toLowerCase().includes(query.toLowerCase()))),[category,query]);
- const count=Object.values(cart).reduce((a,b)=>a+b,0);const add=(id:number)=>setCart(c=>({...c,[id]:(c[id]||0)+1}));const change=(id:number,delta:number)=>setCart(c=>{const n={...c};n[id]=Math.max(0,(n[id]||0)+delta);if(!n[id])delete n[id];return n});
- const orderText = () => [
-  rtl
-    ? 'مرحباً Soft Glow، أود طلب المنتجات التالية:'
-    : 'Hello Soft Glow! I would like to order:',
+export default function Home() {
+  const [lang, setLang] = useState<'en' | 'ar'>('en');
+  const [category, setCategory] = useState<Category | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
+  const [cart, setCart] = useState<Cart>({});
+  const [cartLoaded, setCartLoaded] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  ...Object.entries(cart)
-    .filter(([, qty]) => qty > 0)
-    .map(([id, qty]) => {
-      const product = products.find(
-        p => p.id === Number(id)
-      );
+  useEffect(() => {
+    const savedLang = localStorage.getItem('softglow-lang');
+    if (savedLang === 'en' || savedLang === 'ar') setLang(savedLang);
+    try {
+      const savedCart = localStorage.getItem('softglow-cart');
+      if (savedCart) {
+        const parsed: unknown = JSON.parse(savedCart);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const clean: Cart = {};
+          for (const [id, quantity] of Object.entries(parsed)) {
+            const numberId = Number(id);
+            if (Number.isSafeInteger(numberId) && numberId > 0 &&
+                typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0) {
+              clean[numberId] = Math.min(99, Math.floor(quantity));
+            }
+          }
+          setCart(clean);
+        }
+      }
+    } catch { /* Invalid saved cart: start empty. */ }
+    setCartLoaded(true);
+  }, []);
 
-      if (!product) return '';
+  useEffect(() => {
+    if (cartLoaded) localStorage.setItem('softglow-cart', JSON.stringify(cart));
+  }, [cart, cartLoaded]);
 
-      const name = rtl ? product.ar : product.en;
-      const code = `SG-${String(id).padStart(3, '0')}`;
+  useEffect(() => {
+    if (cartLoaded) localStorage.setItem('softglow-lang', lang);
+  }, [lang, cartLoaded]);
 
-      return `• ${name} (${code}) × ${qty}`;
-    }),
-
-  '',
-  rtl
-    ? 'الرجاء تأكيد الأسعار والتوفر ورسوم التوصيل داخل لبنان.'
-    : 'Please confirm prices, availability, and delivery fees within Lebanon.'
-].join('\n');
- const Arrow=rtl?ArrowLeft:ArrowRight;
- return <div dir={rtl?'rtl':'ltr'} lang={lang}>
- <div className="bg-[#efe3d8] text-center py-2 text-xs tracking-wide">{t.tag} ✦ Lebanon</div>
- <header className="sticky top-0 z-30 bg-[#fbf7f2]/95 backdrop-blur border-b border-[#e9ded3]"><div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between gap-4"><a href="#home" className="serif text-3xl tracking-tight">Soft <span className="italic text-[#a97b61]">Glow</span><span className="block text-[9px] tracking-[.27em] uppercase text-[#927e70] text-center">Handmade with love</span></a><nav className="hidden md:flex items-center gap-7 text-sm"><a href="#home">{t.home}</a><a href="#shop">{t.products}</a><a href="#about">{t.about}</a><a href="#contact">{t.contactNav}</a></nav><div className="flex items-center gap-4"><button aria-label="Switch language" className="text-sm font-semibold" onClick={()=>setLang(l=>l==='en'?'ar':'en')}>{lang==='en'?'العربية':'English'}</button><button aria-label="Open cart" className="relative" onClick={()=>setCartOpen(true)}><ShoppingBag size={22}/>{count>0&&<span className="absolute -top-2 -end-2 bg-[#a97b61] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{count}</span>}</button><button aria-label="Toggle menu" className="md:hidden" onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X/>:<Menu/>}</button></div></div>{menuOpen&&<nav className="md:hidden flex flex-col px-6 pb-4 gap-3 text-sm"><a onClick={()=>setMenuOpen(false)} href="#home">{t.home}</a><a onClick={()=>setMenuOpen(false)} href="#shop">{t.products}</a><a onClick={()=>setMenuOpen(false)} href="#about">{t.about}</a><a onClick={()=>setMenuOpen(false)} href="#contact">{t.contactNav}</a></nav>}</header>
- <main id="home"><section className="bg-[#eee0d1]"><div className="max-w-7xl mx-auto grid md:grid-cols-2 items-center"><div className="p-9 sm:p-14 lg:p-20 order-2 md:order-1"><p className="uppercase tracking-[.25em] text-xs text-[#9c7059] mb-5">SOFT GLOW · LEBANON</p><h1 className="serif text-5xl sm:text-6xl lg:text-7xl leading-[1.08] mb-6">{t.hero}</h1><p className="text-[#78675e] leading-7 max-w-md mb-8">{t.sub}</p><a className="primary inline-flex gap-3 items-center" href="#shop">{t.shop}<Arrow size={17}/></a></div><div className="relative h-[390px] md:h-[590px] order-1 md:order-2"><Image src="/products/02.webp" alt="Soft Glow handmade floral bouquet" fill priority className="object-cover" sizes="(max-width: 768px) 100vw, 50vw"/></div></div></section>
- <section className="max-w-7xl mx-auto px-4 sm:px-8 py-16"><div className="flex justify-between items-end mb-8"><div><p className="uppercase tracking-[.25em] text-xs muted mb-2">SOFT GLOW</p><h2 className="serif text-4xl">{t.cat}</h2></div><a href="#shop" className="text-sm underline underline-offset-4">{t.all}</a></div><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-5">{categories.map(c=><button key={c.id} className="text-center group" onClick={()=>{setCategory(c.id);document.getElementById('shop')?.scrollIntoView({behavior:'smooth'})}}><div className="relative aspect-square rounded-full overflow-hidden mb-3 bg-[#eee0d1]"><Image src={`/products/${String(c.image).padStart(2,'0')}.webp`} alt={lang==='en'?c.en:c.ar} fill sizes="(max-width: 640px) 45vw, 15vw" className="object-cover group-hover:scale-105 transition duration-300"/></div><span className="text-sm">{lang==='en'?c.en:c.ar}</span></button>)}</div></section>
- <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-8 pb-20 scroll-mt-24"><div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-5 mb-7"><div><p className="uppercase tracking-[.25em] text-xs muted mb-2">THE COLLECTION</p><h2 className="serif text-4xl">{t.collection}</h2></div><div className="flex items-center gap-2 bg-white border border-[#e9ded3] rounded-full px-4 py-3"><Search size={17} className="muted"/><input aria-label={t.search} placeholder={t.search} value={query} onChange={e=>setQuery(e.target.value)} className="bg-transparent text-sm w-52"/></div></div><div className="flex gap-2 overflow-x-auto pb-5 mb-4"><button className={`chip ${category==='all'?'active':''}`} onClick={()=>setCategory('all')}>{t.all}</button>{categories.map(c=><button key={c.id} className={`chip ${category===c.id?'active':''}`} onClick={()=>setCategory(c.id)}>{lang==='en'?c.en:c.ar}</button>)}</div><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">{filtered.map(p=><article key={p.id} className="card group"><Link
-  href={`/products/${p.id}`}
-  className="block relative aspect-[4/5] bg-[#eee0d1]"
-><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover group-hover:scale-[1.03] transition duration-300"/><span className="absolute top-3 start-3 bg-white/90 rounded-full px-2 py-1 text-[10px]">SG-{String(p.id).padStart(3,'0')}</span></Link><div className="p-4"><Link href={`/products/${p.id}`}>
-  <h3 className="text-sm sm:text-base font-medium min-h-11 hover:underline">
-    {lang === 'en' ? p.en : p.ar}
-  </h3>
-</Link><p className="text-sm muted my-2">{p.price === null
-  ? (rtl ? 'السعر عند الطلب' : 'Price on request')
-  : `${rtl ? 'السعر التقديري' : 'Estimated price'}: $${p.price.toFixed(2)}`}</p><button onClick={()=>add(p.id)} className="w-full bg-[#5d4133] text-white rounded-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2"><Plus size={15}/>{t.added}</button></div></article>)}</div>{filtered.length===0&&<p className="text-center py-16 muted">{t.noResults}</p>}</section>
-<section className="bg-[#f3eae1] py-14 px-6">
-  <div className="max-w-3xl mx-auto text-center">
-    <h2 className="serif text-4xl mb-5">
-      {rtl ? 'التوصيل إلى جميع أنحاء لبنان' : 'Delivery Across Lebanon'}
-    </h2>
-
-    <p className="text-[#78675e] leading-8 mb-6">
-      {rtl
-        ? 'نستقبل طلباتكم من جميع المناطق اللبنانية. يتم تأكيد رسوم التوصيل ومدة تجهيز الطلب عند التواصل معنا.'
-        : 'We accept orders from all across Lebanon. Delivery fees and preparation times are confirmed when you contact us.'}
-    </p>
-
-    <a
-      href="https://wa.me/96176552059"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="primary inline-flex items-center justify-center"
-    >
-      {rtl ? 'تواصلوا معنا عبر واتساب' : 'Contact us on WhatsApp'}
-    </a>
-  </div>
-</section>
- <section id="about" className="bg-[#efe4d9] py-16 scroll-mt-24"><div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 items-center gap-12"><div className="relative aspect-[5/4] rounded-2xl overflow-hidden"><Image src="/products/20.webp" alt="Soft Glow handmade rose bouquet" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw"/></div><div><p className="uppercase tracking-[.25em] text-xs mb-4">HANDMADE WITH LOVE</p><h2 className="serif text-4xl sm:text-5xl mb-6">{t.intro}</h2><p className="leading-8 text-[#78675e]">{t.introText}</p></div></div></section>
- 
-<section
-  id="contact"
-  className="text-center max-w-3xl mx-auto px-6 py-20 scroll-mt-24"
->
-  <Heart
-    className="mx-auto mb-5 text-[#a97b61]"
-    size={28}
-  />
-
-  <h2 className="serif text-4xl mb-5">
-    {t.custom}
-  </h2>
-
-  <p className="muted leading-8 mb-8">
-    {t.customText}
-  </p>
-
-  {/* WhatsApp Button */}
-  <button
-    className="outline"
-    onClick={() =>
-      whatsapp(
-        rtl
-          ? 'مرحبًا، أود الاستفسار عن طلب مخصص.'
-          : 'Hello Soft Glow, I would like to ask about a custom order.'
-      )
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchProducts() {
+      try {
+        const data = await loadShopProducts();
+        if (!cancelled) {
+          setProducts(data);
+          setProductsError(false);
+        }
+      } catch (error) {
+        console.error('Soft Glow products could not be loaded:', error);
+        if (!cancelled) setProductsError(true);
+      } finally {
+        if (!cancelled) setProductsLoading(false);
+      }
     }
-  >
-    {t.contact}
-  </button>
+    void fetchProducts();
+    return () => { cancelled = true; };
+  }, []);
 
+  const rtl = lang === 'ar';
+  const t = copy[lang];
+  const Arrow = rtl ? ArrowLeft : ArrowRight;
+  const filtered = useMemo(() => products.filter(product =>
+    (category === 'all' || product.category === category) &&
+    `${product.en} ${product.ar}`.toLowerCase().includes(query.trim().toLowerCase())
+  ), [products, category, query]);
+  const productById = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+  const cartEntries = Object.entries(cart).filter(([, qty]) => qty > 0);
+  const count = cartEntries.reduce((sum, [, qty]) => sum + qty, 0);
+  const missingItems = !productsLoading && !productsError &&
+    cartEntries.some(([id]) => !productById.has(Number(id)));
+  const validCartItems = cartEntries.flatMap(([id, qty]) => {
+    const product = productById.get(Number(id));
+    return product ? [{ product, qty }] : [];
+  });
+  const subtotal = validCartItems.reduce((sum, { product, qty }) => sum + (product.price ?? 0) * qty, 0);
+  const allPricesKnown = validCartItems.every(({ product }) => product.price !== null);
 
-  {/* Instagram Link */}
-  <div className="mt-6">
-    <a
-      href="https://www.instagram.com/softglow9000/"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 text-[#7b6254] hover:underline"
-    >
-      Instagram: @softglow9000
-    </a>
-  </div>
-</section>
-</main>
-<footer className="bg-[#5d4133] text-[#f9f0e7] py-10 text-center"><p className="serif text-3xl mb-3">Soft Glow</p><p className="text-sm opacity-80">{t.footer}</p><p className="text-xs opacity-60 mt-5">© {new Date().getFullYear()} Soft Glow</p></footer>
- {cartOpen&&<div className="fixed inset-0 z-50"><button aria-label="Close cart" className="absolute inset-0 bg-black/45 w-full" onClick={()=>setCartOpen(false)}></button><aside className={`absolute top-0 bottom-0 ${rtl?'left-0':'right-0'} bg-[#fbf7f2] w-full max-w-md shadow-2xl p-6 flex flex-col`} dir={rtl?'rtl':'ltr'}><div className="flex justify-between items-center border-b pb-5 mb-6"><h2 className="serif text-3xl">{t.cart} ({count})</h2><button aria-label="Close cart" onClick={()=>setCartOpen(false)}><X/></button></div><div className="flex-1 overflow-y-auto">{count===0?<p className="muted">{t.empty}</p>:Object.entries(cart).map(([id,qty])=>{const p=products.find(p=>p.id===Number(id))!;return <div key={id} className="flex gap-4 mb-5"><div className="relative w-24 h-28 shrink-0 rounded-lg overflow-hidden"><Image src={p.image} alt={lang==='en'?p.en:p.ar} fill className="object-cover" sizes="96px"/></div><div className="flex-1"><p className="text-sm font-medium">{lang==='en'?p.en:p.ar}</p><p className="text-xs muted mt-2">{t.price}</p><div className="flex items-center gap-4 mt-4"><button aria-label="Decrease quantity" onClick={()=>change(p.id,-1)}><Minus size={16}/></button><span>{qty}</span><button aria-label="Increase quantity" onClick={()=>change(p.id,1)}><Plus size={16}/></button><button className="text-xs underline ms-auto" onClick={()=>change(p.id,-qty)}>{t.remove}</button></div></div></div>})}</div>
-<div className="border-t pt-5">
-  <p className="text-xs muted mb-4">
-    {t.note}
-  </p>
+  function changeLanguage() {
+    setLang(current => current === 'en' ? 'ar' : 'en');
+  }
+  function add(id: number) {
+    setCart(current => ({ ...current, [id]: Math.min(99, (current[id] ?? 0) + 1) }));
+  }
+  function change(id: number, delta: number) {
+    setCart(current => {
+      const next = { ...current };
+      const quantity = Math.min(99, Math.max(0, (next[id] ?? 0) + delta));
+      if (quantity === 0) delete next[id];
+      else next[id] = quantity;
+      return next;
+    });
+  }
+  function remove(id: number) {
+    setCart(current => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+  function whatsapp(message: string) {
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  }
+  function orderText() {
+    return [
+      rtl ? 'مرحباً Soft Glow، أود طلب المنتجات التالية:' : 'Hello Soft Glow! I would like to order:',
+      '',
+      ...validCartItems.map(({ product, qty }) => {
+        const name = rtl ? product.ar : product.en;
+        const price = product.price === null ? t.price : `$${product.price.toFixed(2)}`;
+        return `• ${name} (SG-${String(product.id).padStart(3, '0')}) × ${qty} — ${price}`;
+      }),
+      '',
+      allPricesKnown ? `${rtl ? 'المجموع التقديري' : 'Estimated subtotal'}: $${subtotal.toFixed(2)}` : '',
+      rtl ? 'الرجاء تأكيد الأسعار والتوفر ورسوم التوصيل داخل لبنان.' :
+        'Please confirm prices, availability, and delivery fees within Lebanon.',
+    ].filter((line, index, arr) => line !== '' || (index > 0 && arr[index - 1] !== '')).join('\n');
+  }
 
-  {/* Proceed to Checkout */}
-  {count > 0 && (
-    <Link
-      href="/checkout"
-      onClick={() => setCartOpen(false)}
-      className="block text-center bg-[#5d4133] text-white rounded-full px-6 py-4 mb-3 hover:opacity-90"
-    >
-      {rtl ? 'إتمام الطلب' : 'Proceed to Checkout'}
-    </Link>
-  )}
+  return (
+    <div dir={rtl ? 'rtl' : 'ltr'} lang={lang} className="min-h-screen bg-[#fbf7f2] text-[#5d4133]">
+      <div className="bg-[#efe3d8] text-center py-2 text-xs tracking-wide">{t.tag} ✦ Lebanon</div>
+      <header className="sticky top-0 z-30 bg-[#fbf7f2]/95 backdrop-blur border-b border-[#e9ded3]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between gap-4">
+          <a href="#home" className="serif text-3xl tracking-tight">Soft <span className="italic text-[#a97b61]">Glow</span><span className="block text-[9px] tracking-[.27em] uppercase text-[#927e70] text-center">Handmade with love</span></a>
+          <nav className="hidden md:flex items-center gap-7 text-sm">
+            <a href="#home">{t.home}</a><a href="#shop">{t.products}</a>
+            <a href="#about">{t.about}</a><a href="#contact">{t.contactNav}</a>
+          </nav>
+          <div className="flex items-center gap-4">
+            <button type="button" aria-label="Switch language" className="text-sm font-semibold" onClick={changeLanguage}>{rtl ? 'English' : 'العربية'}</button>
+            <button type="button" aria-label="Open cart" className="relative" onClick={() => setCartOpen(true)}>
+              <ShoppingBag size={22}/>{count > 0 && <span className="absolute -top-2 -end-2 bg-[#a97b61] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{count}</span>}
+            </button>
+            <button type="button" aria-label="Toggle menu" className="md:hidden" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X/> : <Menu/>}</button>
+          </div>
+        </div>
+        {menuOpen && <nav className="md:hidden flex flex-col px-6 pb-4 gap-3 text-sm">
+          <a onClick={() => setMenuOpen(false)} href="#home">{t.home}</a>
+          <a onClick={() => setMenuOpen(false)} href="#shop">{t.products}</a>
+          <a onClick={() => setMenuOpen(false)} href="#about">{t.about}</a>
+          <a onClick={() => setMenuOpen(false)} href="#contact">{t.contactNav}</a>
+        </nav>}
+      </header>
 
-  {/* WhatsApp Order */}
-  <button
-    disabled={count === 0}
-    className="primary w-full"
-    onClick={() => whatsapp(orderText())}
-  >
-    {t.order}
-  </button>
-</div>
-</aside></div>}
- </div>;
+      <main id="home">
+        <section className="bg-[#eee0d1]">
+          <div className="max-w-7xl mx-auto grid md:grid-cols-2 items-center">
+            <div className="p-9 sm:p-14 lg:p-20 order-2 md:order-1">
+              <p className="uppercase tracking-[.25em] text-xs text-[#9c7059] mb-5">SOFT GLOW · LEBANON</p>
+              <h1 className="serif text-5xl sm:text-6xl lg:text-7xl leading-[1.08] mb-6">{t.hero}</h1>
+              <p className="text-[#78675e] leading-7 max-w-md mb-8">{t.sub}</p>
+              <a className="primary inline-flex gap-3 items-center" href="#shop">{t.shop}<Arrow size={17}/></a>
+            </div>
+            <div className="relative h-[390px] md:h-[590px] order-1 md:order-2">
+              <Image src="/products/02.webp" alt="Soft Glow handmade floral bouquet" fill priority className="object-cover" sizes="(max-width: 768px) 100vw, 50vw"/>
+            </div>
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-4 sm:px-8 py-16">
+          <div className="flex justify-between items-end mb-8">
+            <div><p className="uppercase tracking-[.25em] text-xs muted mb-2">SOFT GLOW</p><h2 className="serif text-4xl">{t.cat}</h2></div>
+            <a href="#shop" onClick={() => setCategory('all')} className="text-sm underline underline-offset-4">{t.all}</a>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-5">
+            {categories.map(c => <button type="button" key={c.id} className="text-center group" onClick={() => { setCategory(c.id); document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' }); }}>
+              <div className="relative aspect-square rounded-full overflow-hidden mb-3 bg-[#eee0d1]">
+                <Image src={`/products/${String(c.image).padStart(2, '0')}.webp`} alt={rtl ? c.ar : c.en} fill sizes="(max-width: 640px) 45vw, 15vw" className="object-cover group-hover:scale-105 transition duration-300"/>
+              </div>
+              <span className="text-sm">{rtl ? c.ar : c.en}</span>
+            </button>)}
+          </div>
+        </section>
+
+        <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-8 pb-20 scroll-mt-24">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-5 mb-7">
+            <div><p className="uppercase tracking-[.25em] text-xs muted mb-2">THE COLLECTION</p><h2 className="serif text-4xl">{t.collection}</h2></div>
+            <div className="flex items-center gap-2 bg-white border border-[#e9ded3] rounded-full px-4 py-3">
+              <Search size={17} className="muted"/>
+              <input aria-label={t.search} placeholder={t.search} value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent text-sm w-52 outline-none"/>
+            </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-5 mb-4">
+            <button type="button" className={`chip ${category === 'all' ? 'active' : ''}`} onClick={() => setCategory('all')}>{t.all}</button>
+            {categories.map(c => <button type="button" key={c.id} className={`chip ${category === c.id ? 'active' : ''}`} onClick={() => setCategory(c.id)}>{rtl ? c.ar : c.en}</button>)}
+          </div>
+          {productsLoading && <p className="text-center py-10 muted">{t.loading}</p>}
+          {productsError && <p role="alert" className="text-center py-10 text-red-700">{t.error}</p>}
+          {!productsLoading && !productsError && <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {filtered.map(p => <article key={p.id} className="card group">
+                <Link href={`/products/${p.id}`} className="block relative aspect-[4/5] bg-[#eee0d1]">
+                  <Image src={p.image} alt={rtl ? p.ar : p.en} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover group-hover:scale-[1.03] transition duration-300"/>
+                  <span className="absolute top-3 start-3 bg-white/90 rounded-full px-2 py-1 text-[10px]">SG-{String(p.id).padStart(3, '0')}</span>
+                </Link>
+                <div className="p-4">
+                  <Link href={`/products/${p.id}`}><h3 className="text-sm sm:text-base font-medium min-h-11 hover:underline">{rtl ? p.ar : p.en}</h3></Link>
+                  <p className="text-sm muted my-2">{p.price === null ? t.price : `${rtl ? 'السعر التقديري' : 'Estimated price'}: $${p.price.toFixed(2)}`}</p>
+                  <button type="button" onClick={() => add(p.id)} className="w-full bg-[#5d4133] text-white rounded-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2"><Plus size={15}/>{t.added}</button>
+                </div>
+              </article>)}
+            </div>
+            {filtered.length === 0 && <p className="text-center py-16 muted">{t.noResults}</p>}
+          </>}
+        </section>
+
+        <section className="bg-[#f3eae1] py-14 px-6">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="serif text-4xl mb-5">{rtl ? 'التوصيل إلى جميع أنحاء لبنان' : 'Delivery Across Lebanon'}</h2>
+            <p className="text-[#78675e] leading-8 mb-6">{rtl ? 'نستقبل طلباتكم من جميع المناطق اللبنانية. يتم تأكيد رسوم التوصيل ومدة تجهيز الطلب عند التواصل معنا.' : 'We accept orders from all across Lebanon. Delivery fees and preparation times are confirmed when you contact us.'}</p>
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener noreferrer" className="primary inline-flex items-center justify-center">{rtl ? 'تواصلوا معنا عبر واتساب' : 'Contact us on WhatsApp'}</a>
+          </div>
+        </section>
+
+        <section id="about" className="bg-[#efe4d9] py-16 scroll-mt-24">
+          <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 items-center gap-12">
+            <div className="relative aspect-[5/4] rounded-2xl overflow-hidden"><Image src="/products/20.webp" alt="Soft Glow handmade rose bouquet" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw"/></div>
+            <div><p className="uppercase tracking-[.25em] text-xs mb-4">HANDMADE WITH LOVE</p><h2 className="serif text-4xl sm:text-5xl mb-6">{t.intro}</h2><p className="leading-8 text-[#78675e]">{t.introText}</p></div>
+          </div>
+        </section>
+
+        <section id="contact" className="text-center max-w-3xl mx-auto px-6 py-20 scroll-mt-24">
+          <Heart className="mx-auto mb-5 text-[#a97b61]" size={28}/>
+          <h2 className="serif text-4xl mb-5">{t.custom}</h2>
+          <p className="muted leading-8 mb-8">{t.customText}</p>
+          <button type="button" className="outline" onClick={() => whatsapp(rtl ? 'مرحبًا، أود الاستفسار عن طلب مخصص.' : 'Hello Soft Glow, I would like to ask about a custom order.')}>{t.contact}</button>
+          <div className="mt-6"><a href="https://www.instagram.com/softglow9000/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[#7b6254] hover:underline"><Instagram size={18}/> Instagram: @softglow9000</a></div>
+        </section>
+      </main>
+
+      <footer className="bg-[#5d4133] text-[#f9f0e7] py-10 text-center"><p className="serif text-3xl mb-3">Soft Glow</p><p className="text-sm opacity-80">{t.footer}</p><p className="text-xs opacity-60 mt-5">© {new Date().getFullYear()} Soft Glow</p></footer>
+
+      {cartOpen && <div className="fixed inset-0 z-50">
+        <button type="button" aria-label="Close cart" className="absolute inset-0 bg-black/45 w-full" onClick={() => setCartOpen(false)}/>
+        <aside className={`absolute top-0 bottom-0 ${rtl ? 'left-0' : 'right-0'} bg-[#fbf7f2] w-full max-w-md shadow-2xl p-6 flex flex-col`} dir={rtl ? 'rtl' : 'ltr'}>
+          <div className="flex justify-between items-center border-b pb-5 mb-6"><h2 className="serif text-3xl">{t.cart} ({count})</h2><button type="button" aria-label="Close cart" onClick={() => setCartOpen(false)}><X/></button></div>
+          <div className="flex-1 overflow-y-auto">
+            {productsLoading && <p className="muted">{t.loading}</p>}
+            {productsError && <p role="alert" className="text-red-700">{t.error}</p>}
+            {!productsLoading && !productsError && count === 0 && <p className="muted">{t.empty}</p>}
+            {!productsLoading && !productsError && <>
+              {validCartItems.map(({ product: p, qty }) => <div key={p.id} className="flex gap-4 mb-5">
+                <Link href={`/products/${p.id}`} onClick={() => setCartOpen(false)} className="relative w-24 h-28 shrink-0 rounded-lg overflow-hidden"><Image src={p.image} alt={rtl ? p.ar : p.en} fill className="object-cover" sizes="96px"/></Link>
+                <div className="flex-1 min-w-0"><p className="text-sm font-medium">{rtl ? p.ar : p.en}</p><p className="text-xs muted mt-2">{p.price === null ? t.price : `$${p.price.toFixed(2)}`}</p>
+                  <div className="flex items-center gap-4 mt-4"><button type="button" aria-label="Decrease quantity" onClick={() => change(p.id, -1)}><Minus size={16}/></button><span>{qty}</span><button type="button" aria-label="Increase quantity" onClick={() => change(p.id, 1)}><Plus size={16}/></button><button type="button" className="text-xs underline ms-auto" onClick={() => remove(p.id)}>{t.remove}</button></div>
+                </div>
+              </div>)}
+              {missingItems && <div className="text-sm text-red-700 mb-5"><p>{t.unavailable}</p>{cartEntries.filter(([id]) => !productById.has(Number(id))).map(([id]) => <button type="button" key={id} className="flex items-center gap-2 underline mt-2" onClick={() => remove(Number(id))}><Trash2 size={14}/> SG-{String(id).padStart(3, '0')} — {t.remove}</button>)}</div>}
+            </>}
+          </div>
+          <div className="border-t pt-5">
+            {count > 0 && !productsLoading && !productsError && !missingItems && <p className="text-sm mb-3">{rtl ? 'المجموع التقديري' : 'Estimated subtotal'}: {allPricesKnown ? `$${subtotal.toFixed(2)}` : t.price}</p>}
+            <p className="text-xs muted mb-4">{t.note}</p>
+            <Link href="/checkout" onClick={() => setCartOpen(false)} aria-disabled={count === 0 || missingItems || productsLoading || productsError} tabIndex={count === 0 || missingItems || productsLoading || productsError ? -1 : 0} className={`block text-center bg-[#5d4133] text-white rounded-full px-6 py-4 mb-3 hover:opacity-90 ${count === 0 || missingItems || productsLoading || productsError ? 'pointer-events-none opacity-40' : ''}`}>{t.checkout}</Link>
+            <button type="button" disabled={count === 0 || missingItems || productsLoading || productsError} className="primary w-full disabled:opacity-40" onClick={() => whatsapp(orderText())}>{t.order}</button>
+          </div>
+        </aside>
+      </div>}
+    </div>
+  );
 }

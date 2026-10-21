@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, Minus, Plus, ShoppingBag } from 'lucide-react';
 import type { Product } from '@/data/products';
 import { loadShopProducts } from '@/lib/shop-products';
+import { createClient } from '@/lib/supabase/client';
 
 const WHATSAPP_NUMBER = '96176552059';
 const COLORS = [
@@ -25,6 +26,10 @@ export default function ProductPage({
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
+  const [descriptionAr, setDescriptionAr] = useState('');
+  const [gallery, setGallery] = useState<string[]>([]);
+  const [activeImage, setActiveImage] = useState('');
 
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [quantity, setQuantity] = useState(1);
@@ -44,9 +49,21 @@ export default function ProductPage({
     setLoading(true);
     setLoadError('');
 
-    loadShopProducts()
-      .then((items) => {
-        if (active) setProduct(items.find((item) => item.id === Number(id)) ?? null);
+    Promise.all([
+      loadShopProducts(),
+      createClient().from('products')
+        .select('description_en,description_ar,gallery_urls,image_url')
+        .eq('id', Number(id)).eq('is_active', true).maybeSingle(),
+    ])
+      .then(([items, result]) => {
+        if (result.error) throw result.error;
+        if (!active) return;
+        const found = items.find((item) => item.id === Number(id)) ?? null;
+        setProduct(found);
+        setDescriptionEn(result.data?.description_en ?? '');
+        setDescriptionAr(result.data?.description_ar ?? '');
+        setGallery(Array.isArray(result.data?.gallery_urls) ? result.data.gallery_urls : []);
+        setActiveImage(found?.image ?? '');
       })
       .catch(() => {
         if (active) setLoadError('Unable to load this product. Please try again.');
@@ -191,15 +208,20 @@ function orderOnWhatsApp() {
         </Link>
 
         <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
-          <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-[#eee0d1]">
-            <Image
-              src={product.image}
-              alt={name}
-              fill
-              priority
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-            />
+          <div>
+            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-[#eee0d1]">
+              <Image src={activeImage || product.image} alt={name} fill priority unoptimized
+                sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
+            </div>
+            {gallery.length > 0 && <div className="flex flex-wrap gap-3 mt-4">
+              {[product.image, ...gallery].map((url, index) => (
+                <button type="button" key={`${url}-${index}`} onClick={() => setActiveImage(url)}
+                  aria-label={`View product photo ${index + 1}`}
+                  className={`relative w-20 h-20 rounded-xl overflow-hidden border-2 ${activeImage === url ? 'border-[#5d4133]' : 'border-transparent'}`}>
+                  <Image src={url} alt={`${name} photo ${index + 1}`} fill unoptimized sizes="80px" className="object-cover" />
+                </button>
+              ))}
+            </div>}
           </div>
 
           <div className="flex flex-col justify-center">
@@ -218,9 +240,10 @@ function orderOnWhatsApp() {
             </p>
 
             <p className="text-[#78675e] leading-8 mb-8">
-              {rtl
-                ? 'قطعة مصنوعة يدوياً بعناية من سوفت غلو. يمكنكم التواصل معنا للاستفسار عن الألوان والتخصيص والتوفر.'
-                : 'A thoughtfully handmade Soft Glow creation. Contact us to ask about available colors, personalization, and availability.'}
+              {(rtl ? descriptionAr || descriptionEn : descriptionEn || descriptionAr) ||
+                (rtl
+                  ? 'قطعة مصنوعة يدوياً بعناية من سوفت غلو. يمكنكم التواصل معنا للاستفسار عن الألوان والتخصيص والتوفر.'
+                  : 'A thoughtfully handmade Soft Glow creation. Contact us to ask about available colors, personalization, and availability.')}
             </p>
 
 {/* Product Customization */}

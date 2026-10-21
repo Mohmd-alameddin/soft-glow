@@ -55,6 +55,10 @@ export default function ProductManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [gallery, setGallery] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+
 
   const filtered = products.filter(p =>
     `${p.id} ${p.name_en} ${p.name_ar} ${p.category}`
@@ -67,6 +71,7 @@ export default function ProductManager({
   function startNew() {
     const nextId = Math.max(0, ...products.map(p => p.id)) + 1;
 
+    setGallery([]);
     setEditor({
       id: nextId,
       name_en: '',
@@ -83,10 +88,23 @@ export default function ProductManager({
     setMessage('');
   }
 
-  function editProduct(product: AdminProduct) {
+  async function editProduct(product: AdminProduct) {
     setEditor(makeEditor(product));
     setError('');
     setMessage('');
+    setGallery([]);
+    setGalleryLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error: readError } = await supabase.from('products')
+        .select('gallery_urls').eq('id', product.id).single();
+      if (readError) throw readError;
+      setGallery(Array.isArray(data?.gallery_urls) ? data.gallery_urls : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load product images.');
+    } finally {
+      setGalleryLoading(false);
+    }
   }
 
   function update<K extends keyof EditorProduct>(
@@ -98,8 +116,45 @@ export default function ProductManager({
     );
   }
 
+  async function uploadImages(files: FileList | null, asMain: boolean) {
+    if (!files?.length || !editor || uploading) return;
+    setUploading(true);
+    setError('');
+    try {
+      const supabase = createClient();
+      const urls: string[] = [];
+      for (const file of Array.from(files)) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          throw new Error('Only JPG, PNG, or WebP images are allowed.');
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error('Each image must be smaller than 5 MB.');
+        }
+        const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        const path = `${editor.id}/${filename}`;
+        const { error: uploadError } = await supabase.storage
+          .from('product-images').upload(path, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+        urls.push(data.publicUrl);
+      }
+      if (asMain) {
+        update('image_url', urls[0]);
+        if (urls.length > 1) setGallery(previous => [...previous, ...urls.slice(1)]);
+      } else {
+        setGallery(previous => [...previous, ...urls]);
+      }
+      setMessage('Images uploaded. Click Save Product to publish the changes.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleSave() {
-    if (!editor || saving) return;
+    if (!editor || saving || uploading || galleryLoading) return;
 
     setSaving(true);
     setError('');
@@ -114,6 +169,10 @@ export default function ProductManager({
       };
 
       await saveProduct(payload);
+      const supabase = createClient();
+      const { error: galleryError } = await supabase.from('products')
+        .update({ gallery_urls: gallery }).eq('id', payload.id);
+      if (galleryError) throw new Error(`Product saved, but gallery failed: ${galleryError.message}`);
 
       const savedProduct: AdminProduct = {
         ...payload,
@@ -431,6 +490,42 @@ export default function ProductManager({
                   </p>
                 </div>
 
+                <div className="rounded-xl border border-[#e9ded3] bg-[#fbf7f2] p-4 space-y-3">
+                  <p className="font-semibold">Product photos</p>
+                  <p className="text-xs text-[#78675e]">Upload JPG, PNG or WebP (max 5 MB each). Uploads are stored immediately; click Save Product to link them to the product.</p>
+                  <label className="block text-sm font-medium">Upload main photo
+                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
+                      onChange={e => { void uploadImages(e.target.files, true); e.target.value = ''; }}
+                      className="block w-full mt-2 text-sm" />
+                  </label>
+                  <label className="block text-sm font-medium">Upload extra photos
+                    <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={uploading}
+                      onChange={e => { void uploadImages(e.target.files, false); e.target.value = ''; }}
+                      className="block w-full mt-2 text-sm" />
+                  </label>
+                  {uploading && <p className="text-sm">Uploading photos...</p>}
+                  {galleryLoading && <p className="text-sm">Loading existing photos...</p>}
+                  {editor.image_url && <div><p className="text-xs mb-1">Main photo</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={editor.image_url} alt="Main product" className="h-28 w-28 rounded-lg object-cover" />
+                  </div>}
+                  {gallery.length > 0 && <div className="flex flex-wrap gap-3">
+                    {gallery.map((url, index) => <div key={`${url}-${index}`} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Extra photo ${index + 1}`} className="h-24 w-24 rounded-lg object-cover" />
+                      <button type="button" aria-label={`Remove photo ${index + 1}`}
+                        onClick={() => setGallery(previous => previous.filter((_, i) => i !== index))}
+                        className="absolute right-0 top-0 bg-white rounded-full p-1 shadow"><X size={15}/></button>
+                      <div className="flex justify-center gap-2 mt-1">
+                        <button type="button" disabled={index === 0} aria-label="Move image left"
+                          onClick={() => setGallery(previous => { const next = [...previous]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>←</button>
+                        <button type="button" disabled={index === gallery.length - 1} aria-label="Move image right"
+                          onClick={() => setGallery(previous => { const next = [...previous]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })}>→</button>
+                      </div>
+                    </div>)}
+                  </div>}
+                </div>
+
                 <div>
                   <label className="block text-sm mb-2">
                     English description
@@ -475,7 +570,7 @@ export default function ProductManager({
 
                 <button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || uploading || galleryLoading}
                   className="w-full bg-[#5d4133] text-white rounded-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Save size={18} />

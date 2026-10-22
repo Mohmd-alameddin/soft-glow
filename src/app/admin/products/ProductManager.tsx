@@ -9,7 +9,7 @@ import {
   X, Save
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { saveProduct, deleteProduct, type ProductInput } from '../actions';
+import { saveProduct, deleteProduct, type ProductInput, type ColorOption } from '../actions';
 import type { AdminProduct } from './page';
 
 const CATEGORIES = [
@@ -37,6 +37,9 @@ function makeEditor(product: AdminProduct): EditorProduct {
     description_en: product.description_en ?? '',
     description_ar: product.description_ar ?? '',
     is_active: product.is_active,
+    candle_colors: [],
+    gypsum_colors: [],
+    wax_scents: [],
   };
 }
 
@@ -82,6 +85,9 @@ export default function ProductManager({
       description_en: '',
       description_ar: '',
       is_active: false,
+      candle_colors: [],
+      gypsum_colors: [],
+      wax_scents: [],
     });
 
     setError('');
@@ -97,9 +103,15 @@ export default function ProductManager({
     try {
       const supabase = createClient();
       const { data, error: readError } = await supabase.from('products')
-        .select('gallery_urls').eq('id', product.id).single();
+        .select('gallery_urls,candle_colors,gypsum_colors,wax_scents').eq('id', product.id).single();
       if (readError) throw readError;
       setGallery(Array.isArray(data?.gallery_urls) ? data.gallery_urls : []);
+      setEditor(previous => previous && previous.id === product.id ? {
+        ...previous,
+        candle_colors: Array.isArray(data?.candle_colors) ? data.candle_colors as ColorOption[] : [],
+        gypsum_colors: Array.isArray(data?.gypsum_colors) ? data.gypsum_colors as ColorOption[] : [],
+        wax_scents: Array.isArray(data?.wax_scents) ? data.wax_scents as string[] : [],
+      } : previous);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load product images.');
     } finally {
@@ -551,6 +563,64 @@ export default function ProductManager({
                     maxLength={2000}
                     className="w-full border rounded-xl px-4 py-3"
                   />
+                </div>
+
+
+                <div className="border-t pt-5 space-y-3">
+                  <h3 className="text-lg font-semibold">Candle colors (optional)</h3>
+                  <p className="text-xs text-[#78675e]">Leave empty to hide candle colors on the customer page.</p>
+                  {editor.candle_colors.map((color, i) => (
+                    <div key={i} className="flex flex-wrap gap-2 items-center">
+                      <input type="color" aria-label={`Candle color ${i + 1}`} value={color.hex}
+                        onChange={e => update('candle_colors', editor.candle_colors.map((c, j) => j === i ? {...c, hex:e.target.value} : c))}
+                        className="w-12 h-11 cursor-pointer" />
+                      <input aria-label={`Candle color name ${i + 1}`} placeholder="e.g. Ocean Blue" maxLength={60} value={color.name}
+                        onChange={e => update('candle_colors', editor.candle_colors.map((c, j) => j === i ? {...c, name:e.target.value} : c))}
+                        className="flex-1 min-w-32 border rounded-xl px-3 py-2" />
+                      <button type="button" onClick={() => update('candle_colors', editor.candle_colors.filter((_,j)=>j!==i))}
+                        className="text-red-700 px-2" aria-label="Remove candle color"><X size={18}/></button>
+                    </div>
+                  ))}
+                  <button type="button" disabled={editor.candle_colors.length >= 30}
+                    onClick={() => update('candle_colors', [...editor.candle_colors, {name:'',hex:'#D8C1A8'}])}
+                    className="border rounded-full px-4 py-2 text-sm">+ Add candle color</button>
+                </div>
+
+                <div className="border-t pt-5 space-y-3">
+                  <h3 className="text-lg font-semibold">Gypsum colors (optional)</h3>
+                  <p className="text-xs text-[#78675e]">These colors are independent of candle colors.</p>
+                  {editor.gypsum_colors.map((color, i) => (
+                    <div key={i} className="flex flex-wrap gap-2 items-center">
+                      <input type="color" aria-label={`Gypsum color ${i + 1}`} value={color.hex}
+                        onChange={e => update('gypsum_colors', editor.gypsum_colors.map((c, j) => j === i ? {...c, hex:e.target.value} : c))}
+                        className="w-12 h-11 cursor-pointer" />
+                      <input aria-label={`Gypsum color name ${i + 1}`} placeholder="e.g. Sage Green" maxLength={60} value={color.name}
+                        onChange={e => update('gypsum_colors', editor.gypsum_colors.map((c, j) => j === i ? {...c, name:e.target.value} : c))}
+                        className="flex-1 min-w-32 border rounded-xl px-3 py-2" />
+                      <button type="button" onClick={() => update('gypsum_colors', editor.gypsum_colors.filter((_,j)=>j!==i))}
+                        className="text-red-700 px-2" aria-label="Remove gypsum color"><X size={18}/></button>
+                    </div>
+                  ))}
+                  <button type="button" disabled={editor.gypsum_colors.length >= 30}
+                    onClick={() => update('gypsum_colors', [...editor.gypsum_colors, {name:'',hex:'#A5B9A1'}])}
+                    className="border rounded-full px-4 py-2 text-sm">+ Add gypsum color</button>
+                </div>
+
+                <div className="border-t pt-5 space-y-3">
+                  <h3 className="text-lg font-semibold">Wax scents (optional)</h3>
+                  <p className="text-xs text-[#78675e]">Leave empty for products without wax or fragrance choices.</p>
+                  {editor.wax_scents.map((scent, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input aria-label={`Wax scent ${i + 1}`} placeholder="e.g. Rose Wonderland" maxLength={80} value={scent}
+                        onChange={e => update('wax_scents', editor.wax_scents.map((s,j)=>j===i?e.target.value:s))}
+                        className="flex-1 border rounded-xl px-3 py-2" />
+                      <button type="button" onClick={() => update('wax_scents', editor.wax_scents.filter((_,j)=>j!==i))}
+                        className="text-red-700 px-2" aria-label="Remove wax scent"><X size={18}/></button>
+                    </div>
+                  ))}
+                  <button type="button" disabled={editor.wax_scents.length >= 50}
+                    onClick={() => update('wax_scents', [...editor.wax_scents, ''])}
+                    className="border rounded-full px-4 py-2 text-sm">+ Add wax scent</button>
                 </div>
 
                 <label className="flex items-center gap-3">

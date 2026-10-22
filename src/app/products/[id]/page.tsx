@@ -8,15 +8,11 @@ import { ArrowLeft, Minus, Plus, ShoppingBag } from 'lucide-react';
 import type { Product } from '@/data/products';
 import { loadShopProducts } from '@/lib/shop-products';
 import { createClient } from '@/lib/supabase/client';
+import { addCartItem } from '@/lib/cart';
 
 const WHATSAPP_NUMBER = '96176552059';
-const COLORS = [
-  { name: 'White', hex: '#F8F6F1' },
-  { name: 'Beige', hex: '#D8C1A8' },
-  { name: 'Pink', hex: '#E8B6C3' },
-  { name: 'Sage', hex: '#A9B8A2' },
-  { name: 'Brown', hex: '#94715F' },
-];
+type ColorOption = { name: string; hex: string };
+
 export default function ProductPage({
   params,
 }: {
@@ -34,7 +30,12 @@ export default function ProductPage({
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
-  const [selectedColor, setSelectedColor] = useState('Beige');
+  const [candleColors, setCandleColors] = useState<ColorOption[]>([]);
+  const [gypsumColors, setGypsumColors] = useState<ColorOption[]>([]);
+  const [waxScents, setWaxScents] = useState<string[]>([]);
+  const [selectedCandleColor, setSelectedCandleColor] = useState('');
+  const [selectedGypsumColor, setSelectedGypsumColor] = useState('');
+  const [selectedScent, setSelectedScent] = useState('');
   const [customName, setCustomName] = useState('');
   const [occasion, setOccasion] = useState('Birthday');
   const [instructions, setInstructions] = useState('');
@@ -52,7 +53,7 @@ export default function ProductPage({
     Promise.all([
       loadShopProducts(),
       createClient().from('products')
-        .select('description_en,description_ar,gallery_urls,image_url')
+        .select('description_en,description_ar,gallery_urls,image_url,candle_colors,gypsum_colors,wax_scents')
         .eq('id', Number(id)).eq('is_active', true).maybeSingle(),
     ])
       .then(([items, result]) => {
@@ -64,6 +65,15 @@ export default function ProductPage({
         setDescriptionAr(result.data?.description_ar ?? '');
         setGallery(Array.isArray(result.data?.gallery_urls) ? result.data.gallery_urls : []);
         setActiveImage(found?.image ?? '');
+        const candle = Array.isArray(result.data?.candle_colors) ? result.data.candle_colors as ColorOption[] : [];
+        const gypsum = Array.isArray(result.data?.gypsum_colors) ? result.data.gypsum_colors as ColorOption[] : [];
+        const scents = Array.isArray(result.data?.wax_scents) ? result.data.wax_scents as string[] : [];
+        setCandleColors(candle);
+        setGypsumColors(gypsum);
+        setWaxScents(scents);
+        setSelectedCandleColor('');
+        setSelectedGypsumColor('');
+        setSelectedScent('');
       })
       .catch(() => {
         if (active) setLoadError('Unable to load this product. Please try again.');
@@ -117,33 +127,31 @@ export default function ProductPage({
   
 function addToCart() {
   if (!product) return;
-
-  const productId = product.id;
-
-  let cart: Record<number, number> = {};
-
-  try {
-    const saved = localStorage.getItem('softglow-cart');
-
-    if (saved) {
-      cart = JSON.parse(saved);
-    }
-  } catch {
-    cart = {};
+  if ((candleColors.length > 0 && !selectedCandleColor) ||
+      (gypsumColors.length > 0 && !selectedGypsumColor) ||
+      (waxScents.length > 0 && !selectedScent)) {
+    window.alert(rtl ? 'يرجى اختيار جميع خيارات اللون والرائحة المتاحة.' : 'Please select the available colors and scent first.');
+    return;
   }
-
-  cart[productId] = (cart[productId] || 0) + quantity;
-
-  localStorage.setItem(
-    'softglow-cart',
-    JSON.stringify(cart)
-  );
-
+  if (customName.trim() || instructions.trim() || occasion !== 'Birthday') {
+    window.alert(rtl ? 'للطلبات المخصصة يرجى استخدام واتساب.' : 'For personalized requests, please order through WhatsApp.');
+    return;
+  }
+  addCartItem(product.id, quantity, {
+    candleColor: selectedCandleColor,
+    gypsumColor: selectedGypsumColor,
+    waxScent: selectedScent,
+  });
   setAdded(true);
 }
 
-  
 function orderOnWhatsApp() {
+  if ((candleColors.length > 0 && !selectedCandleColor) ||
+      (gypsumColors.length > 0 && !selectedGypsumColor) ||
+      (waxScents.length > 0 && !selectedScent)) {
+    window.alert(rtl ? 'يرجى اختيار جميع خيارات اللون والرائحة المتاحة.' : 'Please select all available color and scent options.');
+    return;
+  }
   const message = rtl
     ? [
         'مرحباً Soft Glow، أود طلب منتج مخصص:',
@@ -151,7 +159,9 @@ function orderOnWhatsApp() {
         `المنتج: ${name}`,
         `رمز المنتج: ${code}`,
         `الكمية: ${quantity}`,
-        `اللون: ${selectedColor}`,
+        ...(candleColors.length ? [`لون الشمع: ${selectedCandleColor || 'لم يتم الاختيار'}`] : []),
+        ...(gypsumColors.length ? [`لون الجبس: ${selectedGypsumColor || 'لم يتم الاختيار'}`] : []),
+        ...(waxScents.length ? [`الرائحة: ${selectedScent || 'لم يتم الاختيار'}`] : []),
         `الاسم المخصص: ${customName.trim() || 'لا يوجد'}`,
         `المناسبة: ${occasion}`,
         `ملاحظات: ${instructions.trim() || 'لا يوجد'}`,
@@ -164,7 +174,9 @@ function orderOnWhatsApp() {
         `Product: ${name}`,
         `Product code: ${code}`,
         `Quantity: ${quantity}`,
-        `Color: ${selectedColor}`,
+        ...(candleColors.length ? [`Candle color: ${selectedCandleColor || 'Not selected'}`] : []),
+        ...(gypsumColors.length ? [`Gypsum color: ${selectedGypsumColor || 'Not selected'}`] : []),
+        ...(waxScents.length ? [`Wax scent: ${selectedScent || 'Not selected'}`] : []),
         `Personalized name: ${customName.trim() || 'None'}`,
         `Occasion: ${occasion}`,
         `Special instructions: ${instructions.trim() || 'None'}`,
@@ -252,36 +264,49 @@ function orderOnWhatsApp() {
     {rtl ? 'خصص طلبك' : 'Personalize Your Order'}
   </h2>
 
-  {/* Colors */}
-  <div className="mb-6">
-    <p className="font-medium mb-3">
-      {rtl ? 'اختر اللون' : 'Choose a color'}
-    </p>
-
-    <div className="flex flex-wrap gap-3">
-      {COLORS.map((color) => (
-        <button
-          key={color.name}
-          type="button"
-          onClick={() => setSelectedColor(color.name)}
-          aria-label={color.name}
-          aria-pressed={selectedColor === color.name}
-          className={`w-11 h-11 rounded-full border-2 ${
-            selectedColor === color.name
-              ? 'border-[#5d4133] ring-2 ring-[#c5a991]'
-              : 'border-[#ded4c9]'
-          }`}
-          style={{ backgroundColor: color.hex }}
-          title={color.name}
-        />
-      ))}
+  {/* Independent product options; hidden when not configured by the admin. */}
+  {candleColors.length > 0 && (
+    <div className="mb-6">
+      <p className="font-medium mb-3">{rtl ? 'لون الشمعة' : 'Candle color'}</p>
+      <div className="flex flex-wrap gap-3">
+        {candleColors.map((color, i) => (
+          <button key={`${color.name}-${i}`} type="button" onClick={() => setSelectedCandleColor(color.name)}
+            aria-label={`${rtl ? 'لون الشمعة' : 'Candle color'}: ${color.name}`}
+            aria-pressed={selectedCandleColor === color.name} title={color.name}
+            className={`w-11 h-11 rounded-full border-2 ${selectedCandleColor === color.name ? 'border-[#5d4133] ring-2 ring-[#c5a991]' : 'border-[#ded4c9]'}`}
+            style={{backgroundColor: color.hex}} />
+        ))}
+      </div>
+      <p className="text-sm mt-3 text-[#78675e]">{selectedCandleColor || (rtl ? 'اختر لون الشمعة' : 'Select a candle color')}</p>
     </div>
+  )}
 
-    <p className="text-sm mt-3 text-[#78675e]">
-      {rtl ? 'اللون المختار:' : 'Selected color:'}{' '}
-      {selectedColor}
-    </p>
-  </div>
+  {gypsumColors.length > 0 && (
+    <div className="mb-6">
+      <p className="font-medium mb-3">{rtl ? 'لون الجبس' : 'Gypsum color'}</p>
+      <div className="flex flex-wrap gap-3">
+        {gypsumColors.map((color, i) => (
+          <button key={`${color.name}-${i}`} type="button" onClick={() => setSelectedGypsumColor(color.name)}
+            aria-label={`${rtl ? 'لون الجبس' : 'Gypsum color'}: ${color.name}`}
+            aria-pressed={selectedGypsumColor === color.name} title={color.name}
+            className={`w-11 h-11 rounded-full border-2 ${selectedGypsumColor === color.name ? 'border-[#5d4133] ring-2 ring-[#c5a991]' : 'border-[#ded4c9]'}`}
+            style={{backgroundColor: color.hex}} />
+        ))}
+      </div>
+      <p className="text-sm mt-3 text-[#78675e]">{selectedGypsumColor || (rtl ? 'اختر لون الجبس' : 'Select a gypsum color')}</p>
+    </div>
+  )}
+
+  {waxScents.length > 0 && (
+    <div className="mb-6">
+      <label htmlFor="waxScent" className="block font-medium mb-3">{rtl ? 'رائحة الشمع' : 'Wax scent'}</label>
+      <select id="waxScent" value={selectedScent} onChange={e => setSelectedScent(e.target.value)}
+        className="w-full border border-[#ded4c9] bg-white rounded-xl px-4 py-3">
+        <option value="">{rtl ? 'اختر الرائحة' : 'Select a scent'}</option>
+        {waxScents.map((scent,i) => <option key={`${scent}-${i}`} value={scent}>{scent}</option>)}
+      </select>
+    </div>
+  )}
 
   {/* Personalized Name */}
   <div className="mb-6">
@@ -389,7 +414,6 @@ function orderOnWhatsApp() {
     type="button"
     onClick={addToCart}
     disabled={
-      selectedColor !== 'Beige' ||
       customName.trim() !== '' ||
       occasion !== 'Birthday' ||
       instructions.trim() !== ''
@@ -403,8 +427,8 @@ function orderOnWhatsApp() {
   {/* Custom Order Information */}
   <p className="text-xs text-center text-[#78675e]">
     {rtl
-      ? 'للطلبات المخصصة، يرجى استخدام زر واتساب.'
-      : 'For customized orders, please use the WhatsApp button.'}
+      ? 'يمكن إضافة الألوان والروائح إلى السلة. للأسماء والطلبات الخاصة يرجى استخدام واتساب.'
+      : 'Colors and scents can be added to your bag. For personalized names or special requests, please use WhatsApp.'}
   </p>
 
 {added && (

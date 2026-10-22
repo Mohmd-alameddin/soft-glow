@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, MapPin, ShoppingBag, Trash2 } from 'lucide-react';
-import { products } from '@/data/products';
+import { loadShopProducts } from '@/lib/shop-products';
+import type { Product } from '@/data/products';
+import { type Cart, readCart, saveCart, updateCartItem, cartOptionLines } from '@/lib/cart';
 
 const WHATSAPP_NUMBER = '96176552059';
 
@@ -20,11 +22,13 @@ const GOVERNORATES = [
   'Nabatieh',
 ];
 
-type Cart = Record<number, number>;
 
 export default function CheckoutPage() {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
-  const [cart, setCart] = useState<Cart>({});
+  const [cart, setCart] = useState<Cart>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const [customerName, setCustomerName] = useState('');
@@ -40,35 +44,33 @@ export default function CheckoutPage() {
       setLang(savedLang);
     }
 
-    try {
-      const savedCart = localStorage.getItem('softglow-cart');
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          setCart(parsed);
-        }
-      }
-    } catch {
-      setCart({});
-    }
-
+    setCart(readCart());
     setLoaded(true);
   }, []);
 
   useEffect(() => {
     if (loaded) {
-      localStorage.setItem('softglow-cart', JSON.stringify(cart));
+      saveCart(cart);
     }
   }, [cart, loaded]);
 
+  useEffect(() => {
+    let active = true;
+    loadShopProducts().then(items => {
+      if (active) { setProducts(items); setProductsError(false); }
+    }).catch(() => { if (active) setProductsError(true); })
+      .finally(() => { if (active) setProductsLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   const rtl = lang === 'ar';
 
-  const cartItems = products
-    .filter((p) => Number(cart[p.id]) > 0)
-    .map((p) => ({
-      ...p,
-      quantity: Math.min(99, Math.max(1, Number(cart[p.id]))),
-    }));
+  const productById = new Map(products.map(p => [p.id, p]));
+  const cartItems = cart.flatMap(item => {
+    const product = productById.get(item.productId);
+    return product ? [{ ...product, item, quantity: item.quantity }] : [];
+  });
+  const missingItems = !productsLoading && !productsError && cart.some(item => !productById.has(item.productId));
 
   const estimatedTotal = cartItems.reduce(
     (sum, p) => sum + (p.price ?? 0) * p.quantity,
@@ -77,16 +79,8 @@ export default function CheckoutPage() {
 
   const allPricesKnown = cartItems.every(p => p.price !== null);
 
-  function updateQuantity(id: number, quantity: number) {
-    setCart(previous => {
-      const next = { ...previous };
-      if (quantity <= 0) {
-        delete next[id];
-      } else {
-        next[id] = Math.min(99, quantity);
-      }
-      return next;
-    });
+  function updateQuantity(key: string, quantity: number) {
+    setCart(previous => updateCartItem(previous, key, quantity));
   }
 
   function changeLanguage() {
@@ -98,7 +92,7 @@ export default function CheckoutPage() {
   function submitOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!cartItems.length) return;
+    if (!cartItems.length || missingItems || productsLoading || productsError) return;
 
     const itemLines = cartItems.map(p => {
       const name = rtl ? p.ar : p.en;
@@ -107,7 +101,7 @@ export default function CheckoutPage() {
         ? (rtl ? 'السعر عند الطلب' : 'Price on request')
         : `$${p.price.toFixed(2)}`;
 
-      return `• ${name} (${code}) x${p.quantity} — ${price}`;
+      return `• ${name} (${code}) x${p.quantity} — ${price}${cartOptionLines(p.item, rtl).map(line => `\n   ${line}`).join('')}`;
     });
 
     const message = rtl
@@ -204,9 +198,11 @@ export default function CheckoutPage() {
             : 'Enter your delivery details to prepare your WhatsApp order.'}
         </p>
 
-        {!loaded ? (
+        {!loaded || productsLoading ? (
           <p>{rtl ? 'جارٍ التحميل...' : 'Loading...'}</p>
-        ) : cartItems.length === 0 ? (
+        ) : productsError ? (
+          <p role="alert" className="text-red-700">{rtl ? 'تعذر تحميل المنتجات، حاول تحديث الصفحة.' : 'Could not load products. Please refresh.'}</p>
+        ) : cart.length === 0 ? (
           <div className="text-center py-20">
             <ShoppingBag size={42} className="mx-auto mb-5" />
             <h2 className="serif text-3xl mb-5">
@@ -224,10 +220,18 @@ export default function CheckoutPage() {
                 {rtl ? 'ملخص الطلب' : 'Order Summary'}
               </h2>
 
+              {missingItems && <div className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                {rtl ? 'بعض المنتجات لم تعد متاحة. احذفها قبل الطلب.' : 'Some products are unavailable. Remove them before ordering.'}
+                {cart.filter(item => !productById.has(item.productId)).map(item => (
+                  <button type="button" key={item.key} className="block underline mt-2" onClick={() => updateQuantity(item.key, 0)}>
+                    SG-{String(item.productId).padStart(3, '0')} — {rtl ? 'إزالة' : 'Remove'}
+                  </button>
+                ))}
+              </div>}
               <div className="space-y-5">
                 {cartItems.map(p => (
                   <div
-                    key={p.id}
+                    key={p.item.key}
                     className="flex gap-4 border-b border-[#e9ded3] pb-5"
                   >
                     <Link
@@ -255,6 +259,8 @@ export default function CheckoutPage() {
                         SG-{String(p.id).padStart(3, '0')}
                       </p>
 
+                      {cartOptionLines(p.item, rtl).map(line => <p key={line} className="text-xs text-[#78675e] mt-1">{line}</p>)}
+
                       <p className="mt-2 text-sm">
                         {p.price === null
                           ? rtl ? 'السعر عند الطلب' : 'Price on request'
@@ -264,7 +270,7 @@ export default function CheckoutPage() {
                       <div className="flex items-center gap-3 mt-3">
                         <button
                           type="button"
-                          onClick={() => updateQuantity(p.id, p.quantity - 1)}
+                          onClick={() => updateQuantity(p.item.key, p.quantity - 1)}
                           className="border rounded-full w-8 h-8"
                           aria-label="Decrease quantity"
                         >
@@ -275,7 +281,7 @@ export default function CheckoutPage() {
 
                         <button
                           type="button"
-                          onClick={() => updateQuantity(p.id, p.quantity + 1)}
+                          onClick={() => updateQuantity(p.item.key, p.quantity + 1)}
                           className="border rounded-full w-8 h-8"
                           aria-label="Increase quantity"
                         >
@@ -284,7 +290,7 @@ export default function CheckoutPage() {
 
                         <button
                           type="button"
-                          onClick={() => updateQuantity(p.id, 0)}
+                          onClick={() => updateQuantity(p.item.key, 0)}
                           className="text-[#a97b61] ms-auto"
                           aria-label="Remove product"
                         >
@@ -431,7 +437,8 @@ export default function CheckoutPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-[#5d4133] text-white rounded-full py-4 font-medium hover:opacity-90"
+                  disabled={missingItems || cartItems.length === 0}
+                  className="w-full disabled:opacity-40 bg-[#5d4133] text-white rounded-full py-4 font-medium hover:opacity-90"
                 >
                   {rtl ? 'إرسال الطلب عبر واتساب' : 'Send Order via WhatsApp'}
                 </button>

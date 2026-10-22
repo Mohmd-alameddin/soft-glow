@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { Category, Product } from '@/data/products';
 import { loadShopProducts } from '@/lib/shop-products';
+import { type Cart, readCart, saveCart, updateCartItem, cartOptionLines } from '@/lib/cart';
 
 const WHATSAPP_NUMBER = '96176552059';
 const categories: { id: Category; en: string; ar: string; image: number }[] = [
@@ -60,7 +61,6 @@ const copy = {
   },
 };
 
-type Cart = Record<number, number>;
 
 export default function Home() {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
@@ -69,7 +69,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(false);
-  const [cart, setCart] = useState<Cart>({});
+  const [cart, setCart] = useState<Cart>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,29 +77,23 @@ export default function Home() {
   useEffect(() => {
     const savedLang = localStorage.getItem('softglow-lang');
     if (savedLang === 'en' || savedLang === 'ar') setLang(savedLang);
-    try {
-      const savedCart = localStorage.getItem('softglow-cart');
-      if (savedCart) {
-        const parsed: unknown = JSON.parse(savedCart);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const clean: Cart = {};
-          for (const [id, quantity] of Object.entries(parsed)) {
-            const numberId = Number(id);
-            if (Number.isSafeInteger(numberId) && numberId > 0 &&
-                typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0) {
-              clean[numberId] = Math.min(99, Math.floor(quantity));
-            }
-          }
-          setCart(clean);
-        }
-      }
-    } catch { /* Invalid saved cart: start empty. */ }
+    setCart(readCart());
     setCartLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (cartLoaded) localStorage.setItem('softglow-cart', JSON.stringify(cart));
+    if (cartLoaded) saveCart(cart);
   }, [cart, cartLoaded]);
+
+  useEffect(() => {
+    const refresh = () => setCart(readCart());
+    window.addEventListener('softglow-cart-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('softglow-cart-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     if (cartLoaded) localStorage.setItem('softglow-lang', lang);
@@ -133,13 +127,13 @@ export default function Home() {
     `${product.en} ${product.ar}`.toLowerCase().includes(query.trim().toLowerCase())
   ), [products, category, query]);
   const productById = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
-  const cartEntries = Object.entries(cart).filter(([, qty]) => qty > 0);
-  const count = cartEntries.reduce((sum, [, qty]) => sum + qty, 0);
+  const cartEntries = cart.filter(item => item.quantity > 0);
+  const count = cartEntries.reduce((sum, item) => sum + item.quantity, 0);
   const missingItems = !productsLoading && !productsError &&
-    cartEntries.some(([id]) => !productById.has(Number(id)));
-  const validCartItems = cartEntries.flatMap(([id, qty]) => {
-    const product = productById.get(Number(id));
-    return product ? [{ product, qty }] : [];
+    cartEntries.some(item => !productById.has(item.productId));
+  const validCartItems = cartEntries.flatMap(item => {
+    const product = productById.get(item.productId);
+    return product ? [{ product, item, qty: item.quantity }] : [];
   });
   const subtotal = validCartItems.reduce((sum, { product, qty }) => sum + (product.price ?? 0) * qty, 0);
   const allPricesKnown = validCartItems.every(({ product }) => product.price !== null);
@@ -147,25 +141,16 @@ export default function Home() {
   function changeLanguage() {
     setLang(current => current === 'en' ? 'ar' : 'en');
   }
-  function add(id: number) {
-    setCart(current => ({ ...current, [id]: Math.min(99, (current[id] ?? 0) + 1) }));
-  }
-  function change(id: number, delta: number) {
+  function change(key: string, delta: number) {
     setCart(current => {
-      const next = { ...current };
-      const quantity = Math.min(99, Math.max(0, (next[id] ?? 0) + delta));
-      if (quantity === 0) delete next[id];
-      else next[id] = quantity;
-      return next;
+      const entry = current.find(item => item.key === key);
+      return entry ? updateCartItem(current, key, entry.quantity + delta) : current;
     });
   }
-  function remove(id: number) {
-    setCart(current => {
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+  function remove(key: string) {
+    setCart(current => updateCartItem(current, key, 0));
   }
+
   function whatsapp(message: string) {
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
@@ -173,10 +158,10 @@ export default function Home() {
     return [
       rtl ? 'مرحباً Soft Glow، أود طلب المنتجات التالية:' : 'Hello Soft Glow! I would like to order:',
       '',
-      ...validCartItems.map(({ product, qty }) => {
+      ...validCartItems.map(({ product, item, qty }) => {
         const name = rtl ? product.ar : product.en;
         const price = product.price === null ? t.price : `$${product.price.toFixed(2)}`;
-        return `• ${name} (SG-${String(product.id).padStart(3, '0')}) × ${qty} — ${price}`;
+        return `• ${name} (SG-${String(product.id).padStart(3, '0')}) × ${qty} — ${price}${cartOptionLines(item, rtl).map(line => `\n   ${line}`).join('')}`;
       }),
       '',
       allPricesKnown ? `${rtl ? 'المجموع التقديري' : 'Estimated subtotal'}: $${subtotal.toFixed(2)}` : '',
@@ -265,7 +250,7 @@ export default function Home() {
                 <div className="p-4">
                   <Link href={`/products/${p.id}`}><h3 className="text-sm sm:text-base font-medium min-h-11 hover:underline">{rtl ? p.ar : p.en}</h3></Link>
                   <p className="text-sm muted my-2">{p.price === null ? t.price : `${rtl ? 'السعر التقديري' : 'Estimated price'}: $${p.price.toFixed(2)}`}</p>
-                  <button type="button" onClick={() => add(p.id)} className="w-full bg-[#5d4133] text-white rounded-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2"><Plus size={15}/>{t.added}</button>
+                  <Link href={`/products/${p.id}`} className="w-full bg-[#5d4133] text-white rounded-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2"><Plus size={15}/>{rtl ? 'اختر الخيارات وأضف للسلة' : 'Choose options / Add to bag'}</Link>
                 </div>
               </article>)}
             </div>
@@ -308,13 +293,13 @@ export default function Home() {
             {productsError && <p role="alert" className="text-red-700">{t.error}</p>}
             {!productsLoading && !productsError && count === 0 && <p className="muted">{t.empty}</p>}
             {!productsLoading && !productsError && <>
-              {validCartItems.map(({ product: p, qty }) => <div key={p.id} className="flex gap-4 mb-5">
+              {validCartItems.map(({ product: p, item, qty }) => <div key={item.key} className="flex gap-4 mb-5">
                 <Link href={`/products/${p.id}`} onClick={() => setCartOpen(false)} className="relative w-24 h-28 shrink-0 rounded-lg overflow-hidden"><Image src={p.image} alt={rtl ? p.ar : p.en} fill className="object-cover" sizes="96px"/></Link>
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium">{rtl ? p.ar : p.en}</p><p className="text-xs muted mt-2">{p.price === null ? t.price : `$${p.price.toFixed(2)}`}</p>
-                  <div className="flex items-center gap-4 mt-4"><button type="button" aria-label="Decrease quantity" onClick={() => change(p.id, -1)}><Minus size={16}/></button><span>{qty}</span><button type="button" aria-label="Increase quantity" onClick={() => change(p.id, 1)}><Plus size={16}/></button><button type="button" className="text-xs underline ms-auto" onClick={() => remove(p.id)}>{t.remove}</button></div>
+                <div className="flex-1 min-w-0"><p className="text-sm font-medium">{rtl ? p.ar : p.en}</p><p className="text-xs muted mt-2">{p.price === null ? t.price : `$${p.price.toFixed(2)}`}</p>{cartOptionLines(item, rtl).map(line => <p key={line} className="text-xs muted mt-1">{line}</p>)}
+                  <div className="flex items-center gap-4 mt-4"><button type="button" aria-label="Decrease quantity" onClick={() => change(item.key, -1)}><Minus size={16}/></button><span>{qty}</span><button type="button" aria-label="Increase quantity" onClick={() => change(item.key, 1)}><Plus size={16}/></button><button type="button" className="text-xs underline ms-auto" onClick={() => remove(item.key)}>{t.remove}</button></div>
                 </div>
               </div>)}
-              {missingItems && <div className="text-sm text-red-700 mb-5"><p>{t.unavailable}</p>{cartEntries.filter(([id]) => !productById.has(Number(id))).map(([id]) => <button type="button" key={id} className="flex items-center gap-2 underline mt-2" onClick={() => remove(Number(id))}><Trash2 size={14}/> SG-{String(id).padStart(3, '0')} — {t.remove}</button>)}</div>}
+              {missingItems && <div className="text-sm text-red-700 mb-5"><p>{t.unavailable}</p>{cartEntries.filter(item => !productById.has(item.productId)).map(item => <button type="button" key={item.key} className="flex items-center gap-2 underline mt-2" onClick={() => remove(item.key)}><Trash2 size={14}/> SG-{String(item.productId).padStart(3, '0')} — {t.remove}</button>)}</div>}
             </>}
           </div>
           <div className="border-t pt-5">

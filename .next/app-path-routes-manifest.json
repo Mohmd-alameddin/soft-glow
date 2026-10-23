@@ -1,16 +1,17 @@
 {
   "/_not-found/page": "/_not-found",
-  "/admin/finance/page": "/admin/finance",
-  "/admin/materials/page": "/admin/materials",
-  "/admin/costing/page": "/admin/costing",
-  "/admin/page": "/admin",
   "/admin/inventory/page": "/admin/inventory",
+  "/admin/page": "/admin",
+  "/admin/finance/page": "/admin/finance",
   "/admin/login/page": "/admin/login",
+  "/admin/costing/page": "/admin/costing",
+  "/admin/production/page": "/admin/production",
+  "/admin/materials/page": "/admin/materials",
   "/admin/sales/page": "/admin/sales",
   "/admin/purchases/page": "/admin/purchases",
+  "/login/page": "/login",
   "/checkout/page": "/checkout",
   "/page": "/",
-  "/login/page": "/login",
   "/products/[id]/page": "/products/[id]",
   "/admin/products/page": "/admin/products"
 }

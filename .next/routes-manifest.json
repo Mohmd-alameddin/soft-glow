@@ -78,6 +78,12 @@
       "namedRegex": "^/admin/materials(?:/)?$"
     },
     {
+      "page": "/admin/production",
+      "regex": "^/admin/production(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/production(?:/)?$"
+    },
+    {
       "page": "/admin/products",
       "regex": "^/admin/products(?:/)?$",
       "routeKeys": {},

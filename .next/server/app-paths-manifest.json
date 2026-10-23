@@ -1,15 +1,16 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/admin/costing/page": "app/admin/costing/page.js",
   "/admin/finance/page": "app/admin/finance/page.js",
-  "/admin/login/page": "app/admin/login/page.js",
-  "/admin/page": "app/admin/page.js",
   "/admin/materials/page": "app/admin/materials/page.js",
+  "/admin/costing/page": "app/admin/costing/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/inventory/page": "app/admin/inventory/page.js",
+  "/admin/login/page": "app/admin/login/page.js",
   "/admin/sales/page": "app/admin/sales/page.js",
   "/admin/purchases/page": "app/admin/purchases/page.js",
   "/checkout/page": "app/checkout/page.js",
+  "/page": "app/page.js",
   "/login/page": "app/login/page.js",
   "/products/[id]/page": "app/products/[id]/page.js",
-  "/page": "app/page.js",
   "/admin/products/page": "app/admin/products/page.js"
 }

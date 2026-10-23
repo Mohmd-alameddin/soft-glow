@@ -1,0 +1,1 @@
+"use strict";exports.id=814,exports.ids=[814],exports.modules={20814:(a,b,c)=>{c.d(b,{createClient:()=>e});var d=c(25559);function e(){return(0,d.k)("https://neukufjaymjubhkqwrcs.supabase.co","sb_publishable_smzV7o_GaNnDR_uz0yf28w_WbXmnfl8")}}};

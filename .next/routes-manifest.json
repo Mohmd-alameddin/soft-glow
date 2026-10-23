@@ -54,10 +54,22 @@
       "namedRegex": "^/admin/login(?:/)?$"
     },
     {
+      "page": "/admin/materials",
+      "regex": "^/admin/materials(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/materials(?:/)?$"
+    },
+    {
       "page": "/admin/products",
       "regex": "^/admin/products(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/admin/products(?:/)?$"
+    },
+    {
+      "page": "/admin/purchases",
+      "regex": "^/admin/purchases(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/purchases(?:/)?$"
     },
     {
       "page": "/checkout",

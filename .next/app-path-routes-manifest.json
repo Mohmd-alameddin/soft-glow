@@ -1,10 +1,10 @@
 {
   "/_not-found/page": "/_not-found",
-  "/admin/login/page": "/admin/login",
-  "/admin/page": "/admin",
-  "/login/page": "/login",
-  "/page": "/",
   "/checkout/page": "/checkout",
+  "/login/page": "/login",
   "/products/[id]/page": "/products/[id]",
+  "/admin/page": "/admin",
+  "/admin/login/page": "/admin/login",
+  "/page": "/",
   "/admin/products/page": "/admin/products"
 }

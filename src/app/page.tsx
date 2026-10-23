@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { Category, Product } from '@/data/products';
 import { loadShopProducts } from '@/lib/shop-products';
+import InstallApp from '@/components/InstallApp';
 import { type Cart, readCart, saveCart, updateCartItem, cartOptionLines } from '@/lib/cart';
 
 const WHATSAPP_NUMBER = '96176552059';
@@ -181,6 +182,7 @@ export default function Home() {
             <a href="#about">{t.about}</a><a href="#contact">{t.contactNav}</a>
           </nav>
           <div className="flex items-center gap-4">
+            <InstallApp lang={lang} />
             <button type="button" aria-label="Switch language" className="text-sm font-semibold" onClick={changeLanguage}>{rtl ? 'English' : 'العربية'}</button>
             <button type="button" aria-label="Open cart" className="relative" onClick={() => setCartOpen(true)}>
               <ShoppingBag size={22}/>{count > 0 && <span className="absolute -top-2 -end-2 bg-[#a97b61] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{count}</span>}

@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[648],{6648:(e,s,u)=>{u.d(s,{createClient:()=>n});var a=u(4354);function n(){return(0,a.k)("https://neukufjaymjubhkqwrcs.supabase.co","sb_publishable_smzV7o_GaNnDR_uz0yf28w_WbXmnfl8")}}}]);

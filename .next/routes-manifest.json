@@ -96,6 +96,12 @@
       "namedRegex": "^/admin/purchases(?:/)?$"
     },
     {
+      "page": "/admin/reviews",
+      "regex": "^/admin/reviews(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/reviews(?:/)?$"
+    },
+    {
       "page": "/admin/sales",
       "regex": "^/admin/sales(?:/)?$",
       "routeKeys": {},
@@ -112,6 +118,12 @@
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/reviews",
+      "regex": "^/reviews(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reviews(?:/)?$"
     }
   ],
   "dataRoutes": [],

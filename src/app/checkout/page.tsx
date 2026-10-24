@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, MapPin, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, ShoppingBag, Trash2, ShieldCheck, MessageCircle, ArrowRight } from 'lucide-react';
 import { loadShopProducts } from '@/lib/shop-products';
 import type { Product } from '@/data/products';
 import { type Cart, readCart, saveCart, updateCartItem, cartOptionLines } from '@/lib/cart';
@@ -37,6 +37,8 @@ export default function CheckoutPage() {
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [formError, setFormError] = useState('');
+  const [whatsappReady, setWhatsappReady] = useState(false);
 
   useEffect(() => {
     const savedLang = localStorage.getItem('softglow-lang');
@@ -64,6 +66,7 @@ export default function CheckoutPage() {
   }, []);
 
   const rtl = lang === 'ar';
+  const BackArrow = rtl ? ArrowRight : ArrowLeft;
 
   const productById = new Map(products.map(p => [p.id, p]));
   const cartItems = cart.flatMap(item => {
@@ -93,6 +96,23 @@ export default function CheckoutPage() {
     event.preventDefault();
 
     if (!cartItems.length || missingItems || productsLoading || productsError) return;
+    setFormError('');
+    setWhatsappReady(false);
+    const digits = phone.replace(/\D/g, '');
+    if (customerName.trim().length < 2) {
+      setFormError(rtl ? 'يرجى إدخال الاسم الكامل.' : 'Please enter your full name.');
+      document.getElementById('customerName')?.focus();
+      return;
+    }
+    if (digits.length < 7 || digits.length > 15) {
+      setFormError(rtl ? 'يرجى إدخال رقم هاتف صحيح (7 إلى 15 رقماً).' : 'Enter a valid phone number (7–15 digits).');
+      document.getElementById('phone')?.focus();
+      return;
+    }
+    if (!governorate || !city.trim() || !address.trim()) {
+      setFormError(rtl ? 'يرجى تعبئة بيانات التوصيل المطلوبة.' : 'Please complete all required delivery details.');
+      return;
+    }
 
     const itemLines = cartItems.map(p => {
       const name = rtl ? p.ar : p.en;
@@ -150,20 +170,17 @@ export default function CheckoutPage() {
           'Please confirm final prices, availability, delivery fees, and preparation time.'
         ].join('\n');
 
-    window.open(
-      `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    setWhatsappReady(true);
   }
 
   return (
     <div
       dir={rtl ? 'rtl' : 'ltr'}
       lang={lang}
-      className="min-h-screen bg-[#fbf7f2] text-[#5d4133]"
+      className="sg-checkout min-h-screen bg-[#fbf7f2] text-[#5d4133]"
     >
-      <header className="border-b border-[#e9ded3] px-6 py-5">
+      <header className="sticky top-0 z-20 border-b border-[#e9ded3] bg-[#fbf7f2]/95 backdrop-blur px-6 py-5">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Link href="/" className="serif text-3xl">
             Soft <span className="italic text-[#a97b61]">Glow</span>
@@ -179,12 +196,12 @@ export default function CheckoutPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-5 py-10">
+      <main className="max-w-6xl mx-auto px-5 py-9 sm:py-12">
         <Link
           href="/#shop"
           className="inline-flex items-center gap-2 text-sm mb-8"
         >
-          <ArrowLeft size={17} />
+          <BackArrow size={17} />
           {rtl ? 'العودة إلى المتجر' : 'Back to shop'}
         </Link>
 
@@ -213,9 +230,9 @@ export default function CheckoutPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-2 gap-12">
+          <div className="grid lg:grid-cols-[.9fr_1.1fr] gap-8 lg:gap-12 items-start">
             {/* Cart Summary */}
-            <section>
+            <section className="sg-checkout-card lg:sticky lg:top-28">
               <h2 className="serif text-2xl mb-6">
                 {rtl ? 'ملخص الطلب' : 'Order Summary'}
               </h2>
@@ -321,7 +338,7 @@ export default function CheckoutPage() {
             </section>
 
             {/* Delivery Form */}
-            <section>
+            <section className="sg-checkout-card">
               <div className="flex items-center gap-2 mb-6">
                 <MapPin size={22} />
                 <h2 className="serif text-2xl">
@@ -330,6 +347,9 @@ export default function CheckoutPage() {
               </div>
 
               <form onSubmit={submitOrder} className="space-y-5">
+                <p className="text-sm text-[#907568]">{rtl ? 'يرجى تعبئة بيانات التوصيل المطلوبة.' : 'Please complete the required delivery details.'}</p>
+                {formError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</p>}
+                {whatsappReady && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{rtl ? 'تم تجهيز الرسالة. تأكد من إرسالها داخل واتساب.' : 'Your message is ready. Make sure to send it in WhatsApp.'}</p>}
                 <div>
                   <label htmlFor="customerName" className="block mb-2">
                     {rtl ? 'الاسم الكامل' : 'Full name'}
@@ -340,7 +360,7 @@ export default function CheckoutPage() {
                     maxLength={100}
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                     placeholder={rtl ? 'الاسم الكامل' : 'Your full name'}
                   />
                 </div>
@@ -356,7 +376,7 @@ export default function CheckoutPage() {
                     maxLength={25}
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                     placeholder="+961 76 123 456"
                   />
                 </div>
@@ -370,7 +390,7 @@ export default function CheckoutPage() {
                     required
                     value={governorate}
                     onChange={e => setGovernorate(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                   >
                     <option value="">
                       {rtl ? 'اختر المحافظة' : 'Select governorate'}
@@ -391,7 +411,7 @@ export default function CheckoutPage() {
                     maxLength={100}
                     value={city}
                     onChange={e => setCity(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                     placeholder={rtl ? 'مثال: جونية' : 'Example: Jounieh'}
                   />
                 </div>
@@ -407,7 +427,7 @@ export default function CheckoutPage() {
                     maxLength={300}
                     value={address}
                     onChange={e => setAddress(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                     placeholder={
                       rtl
                         ? 'الشارع، المبنى، الطابق، الشقة'
@@ -426,7 +446,7 @@ export default function CheckoutPage() {
                     maxLength={500}
                     value={deliveryNotes}
                     onChange={e => setDeliveryNotes(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 bg-white"
+                    className="sg-checkout-field w-full border rounded-xl px-4 py-3 bg-white"
                     placeholder={
                       rtl
                         ? 'علامة مميزة أو تعليمات إضافية'
@@ -438,11 +458,15 @@ export default function CheckoutPage() {
                 <button
                   type="submit"
                   disabled={missingItems || cartItems.length === 0}
-                  className="w-full disabled:opacity-40 bg-[#5d4133] text-white rounded-full py-4 font-medium hover:opacity-90"
+                  className="sg-checkout-submit w-full disabled:opacity-40 bg-[#5d4133] text-white rounded-full py-4 font-medium flex items-center justify-center gap-2"
                 >
-                  {rtl ? 'إرسال الطلب عبر واتساب' : 'Send Order via WhatsApp'}
+                  <MessageCircle size={19} />{rtl ? 'إرسال الطلب عبر واتساب' : 'Send Order via WhatsApp'}
                 </button>
 
+                <div className="flex items-start gap-2 rounded-xl bg-[#f8f0e9] px-4 py-3 text-sm text-[#745b4d]">
+                  <ShieldCheck size={19} className="shrink-0 mt-0.5" />
+                  <span>{rtl ? 'لا يتم الدفع على الموقع. ستُجهز رسالة الطلب عبر واتساب.' : 'No payment is collected on the website. Your order message is prepared for WhatsApp.'}</span>
+                </div>
                 <p className="text-xs text-[#78675e] leading-6">
                   {rtl
                     ? 'لن يتم الدفع الآن. ستُفتح رسالة واتساب لتراجعها وترسلها بنفسك. سيتم تأكيد السعر والتوصيل قبل إتمام الطلب.'

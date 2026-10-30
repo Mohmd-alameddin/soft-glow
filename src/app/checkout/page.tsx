@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, MapPin, ShoppingBag, Trash2, ShieldCheck, MessageCircle, ArrowRight } from 'lucide-react';
@@ -10,6 +11,8 @@ import type { Product } from '@/data/products';
 import { type Cart, readCart, saveCart, updateCartItem, cartOptionLines } from '@/lib/cart';
 
 const WHATSAPP_NUMBER = '96176552059';
+const WHISH_NUMBER = process.env.NEXT_PUBLIC_WHISH_RECEIVING_NUMBER || '';
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
 
 const GOVERNORATES = [
   'Beirut',
@@ -39,6 +42,10 @@ export default function CheckoutPage() {
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [formError, setFormError] = useState('');
   const [whatsappReady, setWhatsappReady] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'whish' | 'cod'>('cod');
+  const [submitting, setSubmitting] = useState(false);
+  const [orderReference, setOrderReference] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
 
   useEffect(() => {
     const savedLang = localStorage.getItem('softglow-lang');
@@ -92,12 +99,14 @@ export default function CheckoutPage() {
     localStorage.setItem('softglow-lang', next);
   }
 
-  function submitOrder(event: React.FormEvent<HTMLFormElement>) {
+  async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!cartItems.length || missingItems || productsLoading || productsError) return;
     setFormError('');
     setWhatsappReady(false);
+    setOrderReference('');
+    setTrackingUrl('');
     const digits = phone.replace(/\D/g, '');
     if (customerName.trim().length < 2) {
       setFormError(rtl ? 'يرجى إدخال الاسم الكامل.' : 'Please enter your full name.');
@@ -114,6 +123,36 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!allPricesKnown) {
+      setFormError(rtl ? 'يوجد منتج يحتاج إلى تأكيد السعر. تواصل معنا عبر واتساب.' : 'One or more items need a price quote. Please contact us on WhatsApp.');
+      return;
+    }
+    if (submitting) return;
+    setSubmitting(true);
+    let reference = '';
+    let orderTrackingUrl = '';
+    try {
+      const { data, error } = await supabase.rpc('create_softglow_order', {
+        p_customer_name: customerName.trim(), p_phone: phone.trim(),
+        p_governorate: governorate, p_city: city.trim(), p_address: address.trim(),
+        p_delivery_notes: deliveryNotes.trim(), p_payment_method: paymentMethod,
+        p_items: cartItems.map(p => ({product_id: p.id, quantity: p.quantity, options: p.item})),
+      });
+      if (error || !data) throw new Error(error?.message || 'Could not create order');
+      const [savedReference, privateToken] = String(data).split('|');
+      if (!savedReference || !/^[a-f0-9]{64}$/.test(privateToken || '')) throw new Error('Tracking setup is missing. Run setup-order-tracking.sql in Supabase.');
+      reference = savedReference;
+      const url = `${window.location.origin}/order/track?token=${privateToken}`;
+      setOrderReference(reference);
+      setTrackingUrl(url);
+      orderTrackingUrl = url;
+    } catch (error) {
+      setFormError((rtl ? 'تعذّر حفظ الطلب: ' : 'Could not save order: ') + (error instanceof Error ? error.message : 'Unknown error'));
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+
     const itemLines = cartItems.map(p => {
       const name = rtl ? p.ar : p.en;
       const code = `SG-${String(p.id).padStart(3, '0')}`;
@@ -127,6 +166,9 @@ export default function CheckoutPage() {
     const message = rtl
       ? [
           'مرحباً Soft Glow، أود تأكيد تفاصيل طلبي:',
+          `رقم الطلب: ${reference}`,
+          `رابط متابعة الطلب (خاص): ${orderTrackingUrl}`,
+          `طريقة الدفع: ${paymentMethod === 'whish' ? 'Whish Money (بانتظار التحقق)' : 'الدفع عند الاستلام'}`,
           '',
           'المنتجات:',
           ...itemLines,
@@ -149,6 +191,9 @@ export default function CheckoutPage() {
         ].join('\n')
       : [
           'Hello Soft Glow! I would like to confirm my order details:',
+          `Order reference: ${reference}`,
+          `Private order tracking link: ${orderTrackingUrl}`,
+          `Payment method: ${paymentMethod === 'whish' ? 'Whish Money (pending verification)' : 'Cash on Delivery'}`,
           '',
           'Products:',
           ...itemLines,
@@ -170,7 +215,9 @@ export default function CheckoutPage() {
           'Please confirm final prices, availability, delivery fees, and preparation time.'
         ].join('\n');
 
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    const popup = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    if (!popup) window.location.href = whatsappUrl;
     setWhatsappReady(true);
   }
 
@@ -347,6 +394,18 @@ export default function CheckoutPage() {
               </div>
 
               <form onSubmit={submitOrder} className="space-y-5">
+                <div className="rounded-2xl border border-[#e6d6c8] bg-[#fffaf5] p-4 space-y-3">
+                  <p className="font-semibold">{rtl ? 'طريقة الدفع' : 'Payment method'}</p>
+                  <label className="flex items-center gap-3 cursor-pointer"><input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />{rtl ? 'الدفع عند الاستلام' : 'Cash on Delivery'}</label>
+                  <label className="flex items-center gap-3 cursor-pointer"><input type="radio" name="paymentMethod" value="whish" checked={paymentMethod === 'whish'} onChange={() => setPaymentMethod('whish')} />{rtl ? 'Whish Money — تحويل يدوي' : 'Whish Money — manual transfer'}</label>
+                  {paymentMethod === 'whish' && <div className="rounded-xl bg-white border border-[#e6d6c8] p-3 text-sm space-y-2">
+                    <p>{rtl ? 'بعد إرسال الطلب، يرجى انتظار تأكيد المبلغ النهائي مع التوصيل قبل التحويل.' : 'After submitting, please confirm the final amount including delivery before transferring.'}</p>
+                    {WHISH_NUMBER && <p className="font-semibold">{rtl ? 'رقم Whish للاستلام: ' : 'Whish receiving number: '}{WHISH_NUMBER}</p>}
+                    <p>{rtl ? 'اذكر رقم الطلب في رسالة التحويل وأرسل إثبات الدفع عبر واتساب. لا يعتبر الطلب مدفوعاً حتى نتحقق من وصول المبلغ.' : 'Include the order reference and send proof through WhatsApp. Payment remains pending until we verify receipt.'}</p>
+                  </div>}
+                  <p className="text-xs text-[#907568]">{rtl ? 'لا يتم تحصيل أي مبلغ تلقائياً من الموقع.' : 'No automatic payment is collected on this website.'}</p>
+                </div>
+                {orderReference && <div role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-emerald-800 text-sm"><p>{rtl ? 'تم حفظ طلبك برقم: ' : 'Order saved with reference: '}{orderReference}</p>{trackingUrl && <div className="mt-2 space-y-1"><a className="font-semibold underline break-all" href={trackingUrl} target="_blank" rel="noopener noreferrer">{rtl ? 'افتح رابط متابعة الطلب' : 'Open your private order tracking page'}</a><p className="text-xs">{rtl ? 'احفظ الرابط. أي شخص لديه الرابط يستطيع رؤية حالة الطلب.' : 'Save this link. Anyone with it can see the order status.'}</p><button type="button" className="underline text-xs" onClick={()=>navigator.clipboard.writeText(trackingUrl)}>{rtl ? 'نسخ الرابط' : 'Copy tracking link'}</button></div>}</div>}
                 <p className="text-sm text-[#907568]">{rtl ? 'يرجى تعبئة بيانات التوصيل المطلوبة.' : 'Please complete the required delivery details.'}</p>
                 {formError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</p>}
                 {whatsappReady && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{rtl ? 'تم تجهيز الرسالة. تأكد من إرسالها داخل واتساب.' : 'Your message is ready. Make sure to send it in WhatsApp.'}</p>}
@@ -457,10 +516,10 @@ export default function CheckoutPage() {
 
                 <button
                   type="submit"
-                  disabled={missingItems || cartItems.length === 0}
+                  disabled={submitting || missingItems || cartItems.length === 0 || !allPricesKnown}
                   className="sg-checkout-submit w-full disabled:opacity-40 bg-[#5d4133] text-white rounded-full py-4 font-medium flex items-center justify-center gap-2"
                 >
-                  <MessageCircle size={19} />{rtl ? 'إرسال الطلب عبر واتساب' : 'Send Order via WhatsApp'}
+                  <MessageCircle size={19} />{submitting ? (rtl ? 'جارٍ حفظ الطلب...' : 'Saving order...') : (rtl ? 'حفظ الطلب وإرساله عبر واتساب' : 'Save Order & Open WhatsApp')}
                 </button>
 
                 <div className="flex items-start gap-2 rounded-xl bg-[#f8f0e9] px-4 py-3 text-sm text-[#745b4d]">

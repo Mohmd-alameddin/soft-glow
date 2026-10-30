@@ -44,7 +44,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      router.replace('/admin/products');
+      router.replace('/admin');
       router.refresh();
     } catch {
       setError('Something went wrong. Please try again.');

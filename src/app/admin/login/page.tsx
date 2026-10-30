@@ -32,6 +32,7 @@ export default function AdminLoginPage() {
         return;
       }
 
+      // Verify that the signed-in user is an administrator.
       const { data: admin, error: adminError } = await supabase
         .from('admin_users')
         .select('user_id')
@@ -44,8 +45,10 @@ export default function AdminLoginPage() {
         return;
       }
 
+      // Redirect to the main Soft Glow Admin Dashboard.
       router.replace('/admin');
       router.refresh();
+
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -66,7 +69,7 @@ export default function AdminLoginPage() {
           </h1>
 
           <p className="text-sm text-[#78675e] mt-2">
-            Sign in to manage your products
+            Sign in to access your business dashboard
           </p>
         </div>
 

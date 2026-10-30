@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/reviews/layout,_N_T_/reviews/page,_N_T_/reviews"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/ef42cd5c8cfc818825733e64085656f86159b1eac28e9c76a45558abce54a879/$/reviews",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/reviews/page"
+    },
+    "isFallback": false
+  }
+}
